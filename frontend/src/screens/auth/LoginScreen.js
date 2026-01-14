@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
 } from "react-native";
 import api from "../../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,7 +18,7 @@ const LoginScreen = ({ navigation }) => {
 
   // --- Login Logic ---
   const handleLogin = async () => {
-    // 1. Validation
+    // 1. Basic Validation
     if (!identifier || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -28,7 +27,7 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // 2. Send request to Backend
+      // 2. Send Login Request to Backend
       const response = await api.post("/users/login", {
         identifier: identifier,
         password: password,
@@ -36,20 +35,47 @@ const LoginScreen = ({ navigation }) => {
 
       // 3. If Login Successful
       if (response.status === 200) {
-        const { token, name, role } = response.data;
+        const data = response.data;
+        // Handle different response structures (user object might be nested)
+        const user = data.user || data;
+        const token = data.token;
+        const role = user.role;
 
-        // Save User Data locally
+        // Save Basic User Data locally
         await AsyncStorage.setItem("userToken", token);
         await AsyncStorage.setItem("userRole", role);
-        await AsyncStorage.setItem("userName", name);
+        await AsyncStorage.setItem("userName", user.name);
+        await AsyncStorage.setItem("userId", user._id);
 
         // 4. Navigate based on Role
         if (role === "admin") {
           navigation.replace("AdminDashboard");
-        } else if (role === "driver") {
-          navigation.replace("DriverDashboard");
         } else if (role === "parent") {
           navigation.replace("ParentDashboard");
+        } else if (role === "driver") {
+          // --- DRIVER FIX: Double Check Profile Data ---
+          // Sometimes the login response doesn't have the latest vanDetails.
+          // We fetch the full profile to be 100% sure.
+          try {
+            const profileRes = await api.get(`/users/profile/${user._id}`);
+            const fullUserProfile = profileRes.data;
+
+            // Check if vehicle details exist
+            if (
+              fullUserProfile.vanDetails &&
+              fullUserProfile.vanDetails.vehicleNo
+            ) {
+              // Setup is complete -> Go to Dashboard
+              navigation.replace("DriverDashboard");
+            } else {
+              // Setup is incomplete -> Go to Setup Screen
+              navigation.replace("DriverSetup");
+            }
+          } catch (err) {
+            console.log("Profile Fetch Error:", err);
+            // Fallback: Go to Setup if there is an error checking
+            navigation.replace("DriverSetup");
+          }
         } else {
           Alert.alert("Error", "Unknown Role: " + role);
         }
@@ -79,7 +105,6 @@ const LoginScreen = ({ navigation }) => {
 
       {/* --- Input Fields --- */}
       <View className="w-full">
-        {/* Email / Phone Input */}
         <View className="mb-4">
           <Text className="text-gray-600 font-semibold mb-2 ml-1">
             Email or Phone
@@ -94,7 +119,6 @@ const LoginScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Password Input */}
         <View className="mb-6">
           <Text className="text-gray-600 font-semibold mb-2 ml-1">
             Password
@@ -108,7 +132,6 @@ const LoginScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Login Button */}
         <TouchableOpacity
           className="w-full bg-blue-600 p-4 rounded-xl items-center shadow-md active:bg-blue-700"
           onPress={handleLogin}
@@ -122,7 +145,6 @@ const LoginScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* --- Register Link --- */}
       <View className="flex-row justify-center mt-8">
         <Text className="text-gray-500">Don't have an account? </Text>
         <TouchableOpacity onPress={() => navigation.navigate("Register")}>

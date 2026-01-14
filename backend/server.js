@@ -3,7 +3,9 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 
+// Route Imports
 const userRoutes = require("./routes/userRoutes");
+const childRoutes = require("./routes/childRoutes");
 
 // Configs
 dotenv.config();
@@ -22,6 +24,7 @@ app.get("/", (req, res) => {
 
 // Routes
 app.use("/api/users", userRoutes);
+app.use("/api/children", childRoutes);
 
 const PORT = process.env.PORT || 5000;
 

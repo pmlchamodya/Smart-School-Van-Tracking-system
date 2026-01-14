@@ -1,38 +1,42 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
-// Define the User Schema (Structure of the user data in the database)
 const userSchema = mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    password: {
-      type: String,
-      required: true,
-    },
-    phoneNumber: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    phoneNumber: { type: String, required: true, unique: true },
     role: {
       type: String,
       enum: ["admin", "driver", "parent"],
       default: "parent",
     },
-    // For Drivers only: Store van details
+
+    // --- Personal Details ---
+    phone: { type: String },
+    birthday: { type: String },
+    gender: { type: String },
+    profileImage: { type: String },
+
+    // --- Driver Specific Identification ---
+    nic: { type: String },
+    licenseNumber: { type: String },
+
+    createdAt: { type: Date, default: Date.now },
+
+    // --- Driver: Vehicle & Route Details ---
     vanDetails: {
-      type: Object,
+      type: Object, // Stores vehicleNo, seats, model
       required: false,
     },
-    // For Parents only: Link to student profiles
+    routeDetails: {
+      startLocation: String,
+      endLocation: String,
+      schools: [String], // Array of school names
+    },
+
+    // --- Parent: Linked Children ---
     children: [
       {
         studentName: String,
@@ -45,23 +49,19 @@ const userSchema = mongoose.Schema(
   }
 );
 
-// Middleware: Encrypt password before saving to the database
+// Middleware: Encrypt password before saving
 userSchema.pre("save", async function () {
-  // If password is not modified, skip encryption
   if (!this.isModified("password")) {
     return;
   }
-
-  // Generate a salt and hash the password
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Method: Verify entered password with the hashed password in database
+// Method: Check password match
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 const User = mongoose.model("User", userSchema);
-
 module.exports = User;
