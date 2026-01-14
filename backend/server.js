@@ -1,45 +1,30 @@
-// server.js (UPDATED)
-
 const express = require("express");
+const dotenv = require("dotenv");
 const cors = require("cors");
-const admin = require("firebase-admin");
+const connectDB = require("./config/db");
 
-// --- 1. Initialize Firebase Admin ---
-const serviceAccount = require("./serviceAccountKey.json");
+const userRoutes = require("./routes/userRoutes");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Configs
+dotenv.config();
+connectDB();
 
-// --- 2. Create Express App ---
 const app = express();
 
-// --- 3. Apply Middleware ---
-app.use(cors()); // Allows requests from your React Native app
-app.use(express.json()); // Allows the server to understand JSON data
+// Middleware
+app.use(express.json());
+app.use(cors());
 
-// --- 4. IMPORT AND USE ALL ROUTES ---
-
-// Import all route files
-const authRoutes = require("./routes/authRoutes");
-const adminRoutes = require("./routes/admin"); // <-- Added this
-const driverRoutes = require("./routes/driver"); // <-- Added this
-const parentRoutes = require("./routes/parent"); // <-- Added this
-
-// Tell the app to use these routes with their base URLs
-app.use("/api/auth", authRoutes); // e.g., /api/auth/register
-app.use("/api/admin", adminRoutes); // e.g., /api/admin/data
-app.use("/api/driver", driverRoutes); // e.g., /api/driver/data
-app.use("/api/parent", parentRoutes); // e.g., /api/parent/data
-
-// --- 5. Define a Test Route ---
-// (This is good for checking if the server is running)
+// Simple Route
 app.get("/", (req, res) => {
-  res.status(200).send("Backend server is live and connected to Firebase!");
+  res.send("API is running...");
 });
 
-// --- 6. Start the Server ---
-const PORT = 5000;
+// Routes
+app.use("/api/users", userRoutes);
+
+const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

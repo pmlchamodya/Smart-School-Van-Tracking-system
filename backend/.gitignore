@@ -1,29 +1,20 @@
-# Dependencies
-# This folder contains all downloaded packages
-/node_modules
+# Node modules (මේවා ගොඩක් ලොකුයි, Git එකට යවන්න ඕන නෑ)
+node_modules/
 
-# Firebase Admin Key
-# --- THIS IS CRITICAL ---
-# This file gives full access to your Firebase project.
-# It must NOT be pushed to GitHub.
-# Make sure this name matches your key file.
-serviceAccountKey.json
-
-# Environment Variables
-# Contains secret keys, database URLs, and other credentials
+# Environment variables (පාස්වර්ඩ් තියෙන ෆයිල්)
 .env
-*.env
+.env.local
 
-# Log files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.log
+# Expo / React Native (Frontend එකට අදාළ අනවශ්‍ය ෆයිල්)
+.expo/
+dist/
+web-build/
 
-# OS generated files
+# Operating System files
 .DS_Store
 Thumbs.db
 
-# Editor directories and files
-.vscode/
-.idea/
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
