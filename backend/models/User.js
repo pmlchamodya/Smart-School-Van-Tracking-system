@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 
 const userSchema = mongoose.Schema(
   {
+    // --- Basic User Info ---
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -13,11 +14,15 @@ const userSchema = mongoose.Schema(
       default: "parent",
     },
 
-    // --- Personal Details ---
+    // --- Personal Details (Common) ---
     phone: { type: String },
     birthday: { type: String },
     gender: { type: String },
     profileImage: { type: String },
+
+    // --- Parent Specific Details ---
+    address: { type: String },
+    emergencyContact: { type: String },
 
     // --- Driver Specific Identification ---
     nic: { type: String },
@@ -27,13 +32,13 @@ const userSchema = mongoose.Schema(
 
     // --- Driver: Vehicle & Route Details ---
     vanDetails: {
-      type: Object, // Stores vehicleNo, seats, model
+      type: Object,
       required: false,
     },
     routeDetails: {
       startLocation: String,
       endLocation: String,
-      schools: [String], // Array of school names
+      schools: [String],
     },
 
     // --- Parent: Linked Children ---
@@ -58,7 +63,7 @@ userSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Method: Check password match
+// Method: Verify password
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

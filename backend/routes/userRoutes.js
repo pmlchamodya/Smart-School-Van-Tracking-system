@@ -3,13 +3,13 @@ const router = express.Router();
 const { registerUser, authUser } = require("../controllers/userController");
 const User = require("../models/User");
 
-// Register a new user
+// --- Register a new user ---
 router.post("/register", registerUser);
 
-// Authenticate user & get token
+// --- Login & Authenticate ---
 router.post("/login", authUser);
 
-// Get user profile data
+// --- Get User Profile ---
 router.get("/profile/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -22,10 +22,10 @@ router.get("/profile/:id", async (req, res) => {
   }
 });
 
-// Update user profile (Handles Driver & Parent updates)
+// --- Update User Profile (Parent & Driver) ---
 router.put("/update/:id", async (req, res) => {
   try {
-    // Destructure all possible fields
+    // Destructure all possible fields from the request
     const {
       name,
       email,
@@ -33,12 +33,15 @@ router.put("/update/:id", async (req, res) => {
       birthday,
       gender,
       profileImage,
+      address,
+      emergencyContact,
       nic,
       licenseNumber,
       vanDetails,
       routeDetails,
     } = req.body;
 
+    // Update the user document
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       {
@@ -48,12 +51,14 @@ router.put("/update/:id", async (req, res) => {
         birthday,
         gender,
         profileImage,
+        address,
+        emergencyContact,
         nic,
         licenseNumber,
         vanDetails,
         routeDetails,
       },
-      { new: true } // Return updated document
+      { new: true }
     );
 
     if (!updatedUser) {
