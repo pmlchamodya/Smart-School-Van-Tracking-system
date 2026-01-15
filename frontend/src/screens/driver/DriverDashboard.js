@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps"; // Import Map Components
+import * as Location from "expo-location"; // Import Location for current position
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -19,6 +21,7 @@ import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
 
 const DriverDashboard = ({ navigation }) => {
+  // --- State Variables ---
   const [driverName, setDriverName] = useState("");
   const [driverId, setDriverId] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
@@ -28,7 +31,42 @@ const DriverDashboard = ({ navigation }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // --- Load Data ---
+  // --- Map Region State ---
+  const [region, setRegion] = useState({
+    latitude: 6.9271, // Default: Colombo
+    longitude: 79.8612,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+
+  // --- Function to get Current Location ---
+  const getCurrentLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Please allow location access to show your current position."
+        );
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    } catch (error) {
+      console.log("Error getting location:", error);
+    }
+  };
+
+  // --- Load Driver Data & Students ---
   const loadDriverData = async () => {
     try {
       setLoading(true);
@@ -40,19 +78,16 @@ const DriverDashboard = ({ navigation }) => {
         const user = userRes.data;
 
         if (user) {
-          // Safety Check: Redirect to setup if details are missing
           if (!user.vanDetails || !user.vanDetails.vehicleNo) {
             navigation.replace("DriverSetup");
             return;
           }
-
           setDriverName(user.name);
           setProfileImage(user.profileImage);
           setMobile(user.phoneNumber);
           setVanDetails(user.vanDetails || {});
         }
 
-        // Fetch Students
         const childRes = await api.get(`/children/driver/${id}`);
         setStudents(childRes.data);
       }
@@ -63,9 +98,11 @@ const DriverDashboard = ({ navigation }) => {
     }
   };
 
+  // Refresh data and location when screen is focused
   useFocusEffect(
     useCallback(() => {
       loadDriverData();
+      getCurrentLocation();
     }, [])
   );
 
@@ -91,21 +128,21 @@ const DriverDashboard = ({ navigation }) => {
   // --- Toggle Journey ---
   const toggleJourney = () => {
     if (isJourneyStarted) {
-      Alert.alert("End Journey", "End journey?", [
+      Alert.alert("End Journey", "Are you sure you want to end the journey?", [
         { text: "Yes", onPress: () => setIsJourneyStarted(false) },
         { text: "Cancel", style: "cancel" },
       ]);
     } else {
       setIsJourneyStarted(true);
-      Alert.alert("Journey Started", "Parents notified.");
+      Alert.alert("Journey Started", "Parents have been notified.");
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <ScrollView className="p-5">
-        {/* Header */}
-        <View className="flex-row justify-between items-start mb-6">
+        {/* --- Header Section --- */}
+        <View className="flex-row justify-between items-start mb-4">
           <View>
             <Text className="text-gray-500 font-medium text-sm">
               Hello Driver,
@@ -131,7 +168,41 @@ const DriverDashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Vehicle Info Card */}
+        {/* --- LIVE MAP SECTION (Click to expand) --- */}
+        <Text className="text-gray-800 font-bold mb-3 text-lg">
+          Live Location
+        </Text>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() =>
+            navigation.navigate("DriverMap", { initialRegion: region })
+          }
+          className="h-56 w-full rounded-3xl overflow-hidden mb-6 shadow-md border border-gray-200 bg-gray-200"
+        >
+          <MapView
+            style={{ width: "100%", height: "100%" }}
+            region={region}
+            scrollEnabled={false} // Disable interaction on dashboard
+            zoomEnabled={false}
+            showsUserLocation={true}
+          >
+            <Marker coordinate={region} title="My Current Location">
+              <View className="bg-blue-600 p-2 rounded-full border-2 border-white">
+                <MaterialCommunityIcons
+                  name="van-passenger"
+                  size={20}
+                  color="white"
+                />
+              </View>
+            </Marker>
+          </MapView>
+          {/* Click hint overlay */}
+          <View className="absolute bottom-2 right-2 bg-black/50 px-2 py-1 rounded-lg">
+            <Text className="text-white text-[10px]">Tap to Expand</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* --- Vehicle Info Card --- */}
         <View className="bg-blue-900 p-4 rounded-2xl mb-6 flex-row justify-between items-center shadow-md">
           <View>
             <Text className="text-blue-200 text-xs uppercase font-bold">
@@ -158,7 +229,7 @@ const DriverDashboard = ({ navigation }) => {
           />
         </View>
 
-        {/* Journey Control */}
+        {/* --- Journey Control Button --- */}
         <TouchableOpacity
           onPress={toggleJourney}
           className={`p-4 rounded-2xl shadow-sm items-center mb-6 ${
@@ -170,7 +241,7 @@ const DriverDashboard = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Student List */}
+        {/* --- Student List --- */}
         <Text className="text-lg font-bold text-gray-800 mb-4">
           Your Students
         </Text>

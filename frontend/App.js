@@ -16,6 +16,9 @@ import DriverProfileScreen from "./src/screens/driver/DriverProfileScreen";
 import EditDriverProfileScreen from "./src/screens/driver/EditDriverProfileScreen";
 import DriverSetupScreen from "./src/screens/driver/DriverSetupScreen";
 import ParentSetupScreen from "./src/screens/parent/ParentSetupScreen";
+import ChangePasswordScreen from "./src/screens/common/ChangePasswordScreen";
+import DriverMapScreen from "./src/screens/driver/DriverMapScreen";
+import ParentMapScreen from "./src/screens/parent/ParentMapScreen";
 
 const Stack = createStackNavigator();
 
@@ -66,6 +69,12 @@ export default function App() {
             component={EditDriverProfileScreen}
             options={{ title: "Edit Driver Details", headerShown: true }}
           />
+          {/* Define the Driver Map Screen */}
+          <Stack.Screen
+            name="DriverMap"
+            component={DriverMapScreen}
+            options={{ headerShown: false }}
+          />
 
           {/* Define the Parent Dashboard Screen */}
           <Stack.Screen
@@ -104,8 +113,19 @@ export default function App() {
             component={EditProfileScreen}
             options={{ title: "Edit Profile", headerShown: true }}
           />
+          {/* Define the Parent Map Screen */}
+          <Stack.Screen
+            name="ParentMap"
+            component={ParentMapScreen}
+            options={{ headerShown: false }}
+          />
 
-          {/* Future Screens for Dashboard will be added here */}
+          {/* Define the Change Password Screen */}
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePasswordScreen}
+            options={{ title: "Change Password", headerShown: true }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
