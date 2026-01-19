@@ -6,10 +6,16 @@ import {
   ScrollView,
   Alert,
   Image,
+  RefreshControl,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import {
+  Ionicons,
+  MaterialIcons,
+  FontAwesome5,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -17,6 +23,7 @@ const ParentDashboard = ({ navigation }) => {
   const [parentName, setParentName] = useState("");
   const [children, setChildren] = useState([]);
   const [profileImage, setProfileImage] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // --- Load Data Function ---
   const loadData = async () => {
@@ -24,14 +31,14 @@ const ParentDashboard = ({ navigation }) => {
       const userId = await AsyncStorage.getItem("userId");
 
       if (userId) {
-        // Fetch User Profile
+        // 1. Fetch User Profile
         const userRes = await api.get(`/users/profile/${userId}`);
         if (userRes.data) {
           setParentName(userRes.data.name);
           setProfileImage(userRes.data.profileImage);
         }
 
-        // Fetch Children List
+        // 2. Fetch Children List
         const childRes = await api.get(`/children/${userId}`);
         setChildren(childRes.data);
       }
@@ -40,13 +47,21 @@ const ParentDashboard = ({ navigation }) => {
     }
   };
 
-  // --- Reload data on focus ---
+  // --- Reload data on screen focus ---
   useFocusEffect(
     useCallback(() => {
       loadData();
     }, [])
   );
 
+  // --- Pull to Refresh Function ---
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // --- Delete Child Logic ---
   const handleDeleteChild = (childId) => {
     Alert.alert("Delete Child", "Are you sure you want to remove this child?", [
       { text: "Cancel", style: "cancel" },
@@ -69,7 +84,12 @@ const ParentDashboard = ({ navigation }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView className="p-5">
+      <ScrollView
+        className="p-5"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* --- Header Section --- */}
         <View className="flex-row justify-between items-center mb-6">
           <View>
@@ -99,11 +119,11 @@ const ParentDashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* --- Live Tracking --- */}
-        <Text className="text-lg font-bold text-gray-800 mb-4">
-          Live Tracking
-        </Text>
-        <TouchableOpacity className="bg-blue-600 p-5 rounded-2xl shadow-md flex-row items-center justify-center mb-8">
+        {/* --- Live Tracking Button --- */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("ParentMap")}
+          className="bg-blue-600 p-5 rounded-2xl shadow-md flex-row items-center justify-center mb-8"
+        >
           <View className="bg-blue-500 p-3 rounded-full mr-4">
             <Ionicons name="location-sharp" size={28} color="white" />
           </View>
@@ -117,7 +137,7 @@ const ParentDashboard = ({ navigation }) => {
           </View>
         </TouchableOpacity>
 
-        {/* --- My Children --- */}
+        {/* --- My Children Header --- */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-lg font-bold text-gray-800">My Children</Text>
           <TouchableOpacity
@@ -129,6 +149,7 @@ const ParentDashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* --- Children List --- */}
         {children.length === 0 ? (
           <View className="bg-white p-6 rounded-2xl items-center justify-center mb-6">
             <Text className="text-gray-400">No children added yet.</Text>
@@ -142,9 +163,10 @@ const ParentDashboard = ({ navigation }) => {
           children.map((child, index) => (
             <View
               key={index}
-              className="bg-white p-5 rounded-2xl shadow-sm mb-4 border-l-4 border-green-500"
+              className="bg-white p-5 rounded-2xl shadow-sm mb-4 border-l-4 border-blue-500"
             >
               <View className="flex-row justify-between items-start">
+                {/* Child Info */}
                 <View className="flex-1">
                   <Text className="text-xl font-bold text-gray-800">
                     {child.name}
@@ -152,14 +174,40 @@ const ParentDashboard = ({ navigation }) => {
                   <Text className="text-gray-500">
                     {child.school} - {child.grade}
                   </Text>
-                  <View className="bg-green-100 px-2 py-1 rounded-md self-start mt-2">
-                    <Text className="text-green-700 font-bold text-xs">
-                      {child.status || "Safe"}
-                    </Text>
-                  </View>
+
+                  {/* --- Check if Driver is Assigned --- */}
+                  {child.driver_id ? (
+                    <View className="bg-green-100 px-2 py-1 rounded-md self-start mt-2 flex-row items-center">
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={14}
+                        color="green"
+                      />
+                      <Text className="text-green-700 font-bold text-xs ml-1">
+                        Van Assigned
+                      </Text>
+                    </View>
+                  ) : (
+                    // Show "Find Transport" Button
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate("FindDriver", { child: child })
+                      }
+                      className="bg-orange-100 px-3 py-2 rounded-md self-start mt-2 flex-row items-center"
+                    >
+                      <MaterialCommunityIcons
+                        name="bus-marker"
+                        size={16}
+                        color="#C2410C"
+                      />
+                      <Text className="text-orange-700 font-bold text-xs ml-1">
+                        Find Transport
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                {/* --- Action Buttons --- */}
+                {/* --- Action Buttons (Edit/Delete) --- */}
                 <View className="flex-row items-center mt-1">
                   <TouchableOpacity
                     onPress={() =>
@@ -181,6 +229,7 @@ const ParentDashboard = ({ navigation }) => {
             </View>
           ))
         )}
+        <View className="mb-10"></View>
       </ScrollView>
     </SafeAreaView>
   );

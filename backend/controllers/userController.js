@@ -1,29 +1,29 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
-// Helper Function: Generate JWT Token
-// Creates a secure token for the user after login/registration
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || "secret123", {
     expiresIn: "30d",
   });
 };
 
-// @desc    Register a new user
-// @route   POST /api/users/register
-// @access  Public
 const registerUser = async (req, res) => {
   const { name, email, password, phoneNumber, role } = req.body;
 
   try {
-    // Check if user already exists with this email
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
+    // 1. Check if Email already exists
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+      return res.status(400).json({ message: "Email already registered" });
     }
 
-    // Create the new user in the database
+    // 2. Check if Phone Number already exists
+    const phoneExists = await User.findOne({ phoneNumber });
+    if (phoneExists) {
+      return res.status(400).json({ message: "Phone number already in use" });
+    }
+
+    // Create User
     const user = await User.create({
       name,
       email,
@@ -32,7 +32,6 @@ const registerUser = async (req, res) => {
       role,
     });
 
-    // If user created successfully, send response with token
     if (user) {
       res.status(201).json({
         _id: user._id,
@@ -49,19 +48,14 @@ const registerUser = async (req, res) => {
   }
 };
 
-// @desc    Auth user & get token (Login)
-// @route   POST /api/users/login
-// @access  Public
 const authUser = async (req, res) => {
   const { identifier, password } = req.body;
 
   try {
-    // Check for user by email or phone number
     const user = await User.findOne({
       $or: [{ email: identifier }, { phoneNumber: identifier }],
     });
 
-    // Check if user exists AND if password matches
     if (user && (await user.matchPassword(password))) {
       res.json({
         _id: user._id,

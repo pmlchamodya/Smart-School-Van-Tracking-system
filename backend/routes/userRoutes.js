@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { registerUser, authUser } = require("../controllers/userController");
 const User = require("../models/User");
+const Child = require("../models/Child");
 const bcrypt = require("bcryptjs");
 
 // --- Register a new user ---
@@ -99,6 +100,43 @@ router.put("/change-password/:id", async (req, res) => {
     res.json({ message: "Password updated successfully" });
   } catch (error) {
     console.error("Password Update Error:", error);
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
+// --- Get Drivers with Seat Availability ---
+router.get("/drivers/search", async (req, res) => {
+  try {
+    // 1. Find all users who are drivers
+    const drivers = await User.find({ role: "driver" }).select("-password");
+
+    // 2. Calculate seat availability for each driver
+    const driversWithStats = await Promise.all(
+      drivers.map(async (driver) => {
+        // Count how many children are assigned to this driver
+        const currentStudentCount = await Child.countDocuments({
+          driver_id: driver._id,
+        });
+
+        // Get total seats from driver details (Default to 0 if not set)
+        const totalSeats = driver.vanDetails?.seats || 0;
+
+        // Calculate remaining seats
+        const availableSeats = totalSeats - currentStudentCount;
+
+        // Return driver object with extra stats
+        return {
+          ...driver.toObject(),
+          currentStudentCount,
+          availableSeats: availableSeats > 0 ? availableSeats : 0,
+          isFull: availableSeats <= 0,
+        };
+      })
+    );
+
+    res.json(driversWithStats);
+  } catch (error) {
+    console.error("Error fetching drivers:", error);
     res.status(500).json({ message: "Server Error", error });
   }
 });

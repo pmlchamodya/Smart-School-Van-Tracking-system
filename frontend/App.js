@@ -19,6 +19,7 @@ import ParentSetupScreen from "./src/screens/parent/ParentSetupScreen";
 import ChangePasswordScreen from "./src/screens/common/ChangePasswordScreen";
 import DriverMapScreen from "./src/screens/driver/DriverMapScreen";
 import ParentMapScreen from "./src/screens/parent/ParentMapScreen";
+import FindDriverScreen from "./src/screens/driver/FindDriverScreen";
 
 const Stack = createStackNavigator();
 
@@ -73,6 +74,12 @@ export default function App() {
           <Stack.Screen
             name="DriverMap"
             component={DriverMapScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Define the Find Driver Screen */}
+          <Stack.Screen
+            name="FindDriver"
+            component={FindDriverScreen}
             options={{ headerShown: false }}
           />
 

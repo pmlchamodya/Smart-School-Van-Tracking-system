@@ -32,13 +32,18 @@ const userSchema = mongoose.Schema(
 
     // --- Driver: Vehicle & Route Details ---
     vanDetails: {
-      type: Object,
-      required: false,
+      vehicleNo: { type: String },
+      seats: { type: Number, default: 0 },
+      model: { type: String },
     },
     routeDetails: {
       startLocation: String,
       endLocation: String,
+      startTime: String,
+      duration: String,
+
       schools: [String],
+      cities: [String],
     },
 
     // --- Parent: Linked Children ---
@@ -54,7 +59,7 @@ const userSchema = mongoose.Schema(
   }
 );
 
-// Middleware: Encrypt password before saving
+// Middleware: Hash password before saving
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) {
     return;
