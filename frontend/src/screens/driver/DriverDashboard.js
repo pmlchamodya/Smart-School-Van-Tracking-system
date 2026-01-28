@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps"; // Import Map Components
-import * as Location from "expo-location"; // Import Location for current position
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -19,6 +19,16 @@ import {
 } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
+import io from "socket.io-client";
+
+// --- SOCKET CONNECTION ---
+// THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
+// const socket = io("http://192.168.1.3:5000", {
+//   transports: ["websocket"],
+// });
+const socket = io("http://10.16.139.205:5000", {
+  transports: ["websocket"],
+});
 
 const DriverDashboard = ({ navigation }) => {
   // --- State Variables ---
@@ -39,14 +49,14 @@ const DriverDashboard = ({ navigation }) => {
     longitudeDelta: 0.01,
   });
 
-  // --- Function to get Current Location ---
+  // --- 1. Get Current Location (Initial Load) ---
   const getCurrentLocation = async () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission Denied",
-          "Please allow location access to show your current position."
+          "Please allow location access to show your current position.",
         );
         return;
       }
@@ -65,6 +75,54 @@ const DriverDashboard = ({ navigation }) => {
       console.log("Error getting location:", error);
     }
   };
+
+  // --- 2. Live Tracking Logic (Socket.io) ---
+  useEffect(() => {
+    let locationSubscription;
+
+    const startTracking = async () => {
+      if (isJourneyStarted && driverId) {
+        console.log("Starting Live Tracking...");
+
+        // Watch for location changes
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 5000,
+            distanceInterval: 10,
+          },
+          (location) => {
+            const { latitude, longitude } = location.coords;
+
+            // Update local map
+            setRegion((prev) => ({ ...prev, latitude, longitude }));
+
+            // Emit location to Backend
+            console.log("Sending Location:", latitude, longitude);
+            socket.emit("sendLocation", {
+              driverId: driverId,
+              latitude,
+              longitude,
+            });
+          },
+        );
+      }
+    };
+
+    if (isJourneyStarted) {
+      startTracking();
+    } else {
+      // Stop tracking if journey ends
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (locationSubscription) locationSubscription.remove();
+    };
+  }, [isJourneyStarted, driverId]);
 
   // --- Load Driver Data & Students ---
   const loadDriverData = async () => {
@@ -98,12 +156,11 @@ const DriverDashboard = ({ navigation }) => {
     }
   };
 
-  // Refresh data and location when screen is focused
   useFocusEffect(
     useCallback(() => {
       loadDriverData();
       getCurrentLocation();
-    }, [])
+    }, []),
   );
 
   // --- Toggle Student Status ---
@@ -112,12 +169,12 @@ const DriverDashboard = ({ navigation }) => {
       currentStatus === "safe"
         ? "in-van"
         : currentStatus === "in-van"
-        ? "school"
-        : "safe";
+          ? "school"
+          : "safe";
     try {
       await api.put(`/children/${childId}`, { status: newStatus });
       setStudents((prev) =>
-        prev.map((c) => (c._id === childId ? { ...c, status: newStatus } : c))
+        prev.map((c) => (c._id === childId ? { ...c, status: newStatus } : c)),
       );
       Alert.alert("Success", `Status updated to: ${newStatus}`);
     } catch (error) {
@@ -182,7 +239,7 @@ const DriverDashboard = ({ navigation }) => {
           <MapView
             style={{ width: "100%", height: "100%" }}
             region={region}
-            scrollEnabled={false} // Disable interaction on dashboard
+            scrollEnabled={false}
             zoomEnabled={false}
             showsUserLocation={true}
           >
@@ -263,8 +320,8 @@ const DriverDashboard = ({ navigation }) => {
                     child.status === "in-van"
                       ? "bg-yellow-100"
                       : child.status === "safe"
-                      ? "bg-green-100"
-                      : "bg-gray-100"
+                        ? "bg-green-100"
+                        : "bg-gray-100"
                   }`}
                 >
                   <Text
@@ -272,8 +329,8 @@ const DriverDashboard = ({ navigation }) => {
                       child.status === "in-van"
                         ? "text-yellow-700"
                         : child.status === "safe"
-                        ? "text-green-700"
-                        : "text-gray-600"
+                          ? "text-green-700"
+                          : "text-gray-600"
                     }`}
                   >
                     {child.status}
