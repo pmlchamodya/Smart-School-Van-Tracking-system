@@ -51,7 +51,7 @@ const ParentDashboard = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, []),
   );
 
   // --- Pull to Refresh Function ---
