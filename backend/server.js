@@ -8,6 +8,7 @@ const { Server } = require("socket.io");
 // Route Imports
 const userRoutes = require("./routes/userRoutes");
 const childRoutes = require("./routes/childRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 // Configs
 dotenv.config();
@@ -36,6 +37,7 @@ app.get("/", (req, res) => {
 // Routes
 app.use("/api/users", userRoutes);
 app.use("/api/children", childRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // Socket.io connection
 io.on("connection", (socket) => {
@@ -43,6 +45,19 @@ io.on("connection", (socket) => {
   socket.on("sendLocation", (data) => {
     console.log("Location received:", data);
     io.emit(`receiveLocation_${data.driverId}`, data);
+  });
+
+  // Attendance Update Signal
+  socket.on("attendanceUpdated", (data) => {
+    console.log("Attendance updated! Notifying driver:", data.driverId);
+    io.emit(`refreshDriver_${data.driverId}`);
+  });
+
+  // Journey Ended Signal
+  socket.on("journeyEnded", (data) => {
+    console.log("Journey ended for driver:", data.driverId);
+    // Notify the parent app that the journey has ended
+    io.emit(`journeyEnded_${data.driverId}`);
   });
 
   socket.on("disconnect", () => {

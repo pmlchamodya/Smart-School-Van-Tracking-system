@@ -20,6 +20,8 @@ import ChangePasswordScreen from "./src/screens/common/ChangePasswordScreen";
 import DriverMapScreen from "./src/screens/driver/DriverMapScreen";
 import ParentMapScreen from "./src/screens/parent/ParentMapScreen";
 import FindDriverScreen from "./src/screens/driver/FindDriverScreen";
+import DriverPaymentScreen from "./src/screens/driver/DriverPaymentScreen";
+import ParentPaymentScreen from "./src/screens/parent/ParentPaymentScreen";
 
 const Stack = createStackNavigator();
 
@@ -124,6 +126,19 @@ export default function App() {
           <Stack.Screen
             name="ParentMap"
             component={ParentMapScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Define the Driver Payment Screen */}
+          <Stack.Screen
+            name="DriverPayments"
+            component={DriverPaymentScreen}
+            options={{ headerShown: false }}
+          />
+
+          {/* Define the Parent Payment Screen */}
+          <Stack.Screen
+            name="ParentPayments"
+            component={ParentPaymentScreen}
             options={{ headerShown: false }}
           />
 
