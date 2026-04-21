@@ -31,6 +31,7 @@ router.post("/generate-monthly", async (req, res) => {
         // Create a new 'Pending' payment record
         await Payment.create({
           childId: child._id,
+          childName: child.name,
           parentId: child.parent_id,
           driverId: child.driver_id,
           month: month,

@@ -18,6 +18,13 @@ import {
 } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
+import io from "socket.io-client";
+
+// --- SOCKET CONNECTION ---
+// THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
+const socket = io("http://192.168.1.3:5000", {
+  transports: ["websocket"],
+});
 
 const ParentDashboard = ({ navigation }) => {
   const [parentName, setParentName] = useState("");
@@ -44,6 +51,36 @@ const ParentDashboard = ({ navigation }) => {
       }
     } catch (error) {
       console.error("Error loading data:", error);
+    }
+  };
+
+  // --- Toggle Attendance Function ---
+  const toggleAttendance = async (childId, currentIsAbsent) => {
+    try {
+      // Send PUT request to update attendance status in the backend
+      const response = await api.put(`/children/attendance/${childId}`, {
+        isAbsent: !currentIsAbsent, // Toggle the current boolean value
+      });
+
+      // Update the local state to show changes instantly without refreshing the screen
+      setChildren((prevChildren) =>
+        prevChildren.map((child) =>
+          child._id === childId
+            ? { ...child, isAbsent: !currentIsAbsent }
+            : child,
+        ),
+      );
+      // Emit Socket Event to notify the driver about attendance change
+      const targetChild = children.find((c) => c._id === childId);
+      if (targetChild && targetChild.driver_id) {
+        socket.emit("attendanceUpdated", { driverId: targetChild.driver_id });
+      }
+
+      // Show success message
+      // Alert.alert("Success", response.data.message); // (Optional: Commented out to prevent annoying popups every time)
+    } catch (error) {
+      console.error("Attendance Update Error:", error);
+      Alert.alert("Error", "Could not update attendance. Try again.");
     }
   };
 
@@ -137,6 +174,25 @@ const ParentDashboard = ({ navigation }) => {
           </View>
         </TouchableOpacity>
 
+        {/* --- Financial / Payments Button --- */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("ParentPayments")}
+          className="bg-green-600 p-5 rounded-2xl shadow-md flex-row items-center justify-between mb-8"
+        >
+          <View className="flex-row items-center">
+            <MaterialIcons name="receipt-long" size={28} color="white" />
+            <View className="ml-3">
+              <Text className="text-white font-bold text-lg">
+                My Bills & Payments
+              </Text>
+              <Text className="text-green-100 text-sm">
+                Pay van fees & view receipts
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="white" />
+        </TouchableOpacity>
+
         {/* --- My Children Header --- */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-lg font-bold text-gray-800">My Children</Text>
@@ -226,6 +282,26 @@ const ParentDashboard = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* --- Attendance Toggle Button (Tailwind Version) --- */}
+              <TouchableOpacity
+                className={`mt-4 py-3 px-4 rounded-xl items-center justify-center border ${
+                  child.isAbsent
+                    ? "bg-red-50 border-red-300"
+                    : "bg-blue-50 border-blue-300"
+                }`}
+                onPress={() => toggleAttendance(child._id, child.isAbsent)}
+              >
+                <Text
+                  className={`font-bold text-sm ${
+                    child.isAbsent ? "text-red-700" : "text-blue-700"
+                  }`}
+                >
+                  {child.isAbsent
+                    ? "🔴 Not Going Today (Absent)"
+                    : "🟢 Going Today (Present)"}
+                </Text>
+              </TouchableOpacity>
             </View>
           ))
         )}

@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  Alert,
+  TouchableOpacity,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../services/api";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,9 +19,13 @@ const DriverSetupScreen = ({ navigation }) => {
   const [licenseNumber, setLicenseNumber] = useState("");
   const [vehicleNo, setVehicleNo] = useState("");
   const [seats, setSeats] = useState("");
+  const [model, setModel] = useState("");
+
+  // Route Info
   const [startLocation, setStartLocation] = useState("");
   const [endLocation, setEndLocation] = useState("");
   const [schools, setSchools] = useState("");
+  const [cities, setCities] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +37,8 @@ const DriverSetupScreen = ({ navigation }) => {
       !vehicleNo ||
       !seats ||
       !startLocation ||
-      !schools
+      !schools ||
+      !cities
     ) {
       Alert.alert("Missing Info", "Please fill all required fields.");
       return;
@@ -36,15 +48,30 @@ const DriverSetupScreen = ({ navigation }) => {
     try {
       const userId = await AsyncStorage.getItem("userId");
 
+      // Convert comma-separated strings to Arrays
+      const schoolsArray = schools
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+      const citiesArray = cities
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c);
+
       // Prepare Data Payload
       const updateData = {
         nic,
         licenseNumber,
-        vanDetails: { vehicleNo, seats },
+        vanDetails: {
+          vehicleNo,
+          seats: parseInt(seats),
+          model,
+        },
         routeDetails: {
           startLocation,
           endLocation,
-          schools: schools.split(",").map((s) => s.trim()),
+          schools: schoolsArray,
+          cities: citiesArray,
         },
       };
 
@@ -108,13 +135,21 @@ const DriverSetupScreen = ({ navigation }) => {
           value={vehicleNo}
           onChangeText={setVehicleNo}
         />
-        <TextInput
-          className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6"
-          placeholder="Total Seats"
-          keyboardType="numeric"
-          value={seats}
-          onChangeText={setSeats}
-        />
+        <View className="flex-row justify-between mb-6">
+          <TextInput
+            className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-[48%]"
+            placeholder="Total Seats"
+            keyboardType="numeric"
+            value={seats}
+            onChangeText={setSeats}
+          />
+          <TextInput
+            className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-[48%]"
+            placeholder="Model (e.g. KDH)"
+            value={model}
+            onChangeText={setModel}
+          />
+        </View>
 
         {/* --- Route Info --- */}
         <Text className="text-gray-700 font-bold mb-3 text-sm uppercase">
@@ -123,7 +158,7 @@ const DriverSetupScreen = ({ navigation }) => {
         <View className="flex-row justify-between mb-4">
           <TextInput
             className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex-1 mr-2"
-            placeholder="Start Location"
+            placeholder="Start City"
             value={startLocation}
             onChangeText={setStartLocation}
           />
@@ -134,11 +169,28 @@ const DriverSetupScreen = ({ navigation }) => {
             onChangeText={setEndLocation}
           />
         </View>
+
+        {/* Schools */}
+        <Text className="text-gray-400 text-xs mb-1">
+          Covered Schools (Comma Separated)
+        </Text>
         <TextInput
-          className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-8"
-          placeholder="Schools Covered (Comma Separated)"
+          className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
+          placeholder="Ex: Rahula, Sujatha, St. Thomas"
           value={schools}
           onChangeText={setSchools}
+          multiline
+        />
+
+        {/* Cities */}
+        <Text className="text-gray-400 text-xs mb-1">
+          Main Cities on Route (Comma Separated)
+        </Text>
+        <TextInput
+          className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-8"
+          placeholder="Ex: Matara, Kamburupitiya, Akuressa"
+          value={cities}
+          onChangeText={setCities}
           multiline
         />
 
@@ -147,7 +199,7 @@ const DriverSetupScreen = ({ navigation }) => {
           onPress={handleSaveDetails}
           loading={loading}
         />
-        <View className="mb-4"></View>
+        <View className="mb-10"></View>
       </ScrollView>
     </SafeAreaView>
   );

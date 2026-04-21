@@ -8,6 +8,11 @@ const paymentSchema = new mongoose.Schema(
       ref: "Child",
       required: true,
     },
+    // --- Snapshot of the child's name ---
+    childName: {
+      type: String,
+      required: true,
+    },
     // --- Who is paying? (Parent) ---
     parentId: {
       type: mongoose.Schema.Types.ObjectId,

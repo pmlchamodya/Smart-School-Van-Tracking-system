@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
+import socket from "../../services/socket"; // Import centralized socket
 
 const DriverPaymentScreen = ({ navigation }) => {
   const [payments, setPayments] = useState([]);
@@ -20,7 +21,7 @@ const DriverPaymentScreen = ({ navigation }) => {
   // --- Get Current Month in "YYYY-MM" format ---
   const getCurrentMonth = () => {
     const date = new Date();
-    return date.toISOString().slice(0, 7); // e.g., "2026-04"
+    return date.toISOString().slice(0, 7);
   };
 
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
@@ -32,7 +33,6 @@ const DriverPaymentScreen = ({ navigation }) => {
       const driverId = await AsyncStorage.getItem("userId");
 
       if (driverId) {
-        // Fetch data using the route we created in the backend
         const response = await api.get(
           `/payments/driver/${driverId}/${currentMonth}`,
         );
@@ -53,6 +53,36 @@ const DriverPaymentScreen = ({ navigation }) => {
     }, [currentMonth]),
   );
 
+  // --- Listen for Live Payment Updates via Socket.io ---
+  useEffect(() => {
+    let currentDriverId = null;
+
+    const setupLiveUpdates = async () => {
+      currentDriverId = await AsyncStorage.getItem("userId");
+
+      if (currentDriverId) {
+        // 1. Listen for the unique event for this specific driver
+        socket.on(`refreshPayments_${currentDriverId}`, () => {
+          fetchPayments(); // Refresh list silently
+        });
+      }
+
+      // 2. Listen for the global fallback event
+      socket.on("refreshPayments_global", () => {
+        fetchPayments();
+      });
+    };
+
+    setupLiveUpdates();
+
+    return () => {
+      if (currentDriverId) {
+        socket.off(`refreshPayments_${currentDriverId}`);
+      }
+      socket.off("refreshPayments_global");
+    };
+  }, [currentMonth]);
+
   // --- Mark a Payment as Paid (Cash) ---
   const handleMarkAsPaid = (paymentId, childName) => {
     Alert.alert("Confirm Payment", `Did you receive cash from ${childName}?`, [
@@ -61,13 +91,12 @@ const DriverPaymentScreen = ({ navigation }) => {
         text: "Yes, Mark Paid",
         onPress: async () => {
           try {
-            // Send PUT request to backend
             await api.put(`/payments/mark-paid/${paymentId}`, {
               paymentMethod: "Cash",
             });
 
             Alert.alert("Success", "Payment updated successfully!");
-            fetchPayments(); // Refresh the list
+            fetchPayments();
           } catch (error) {
             console.error("Error updating payment:", error);
             Alert.alert("Error", "Could not update payment.");
@@ -81,7 +110,6 @@ const DriverPaymentScreen = ({ navigation }) => {
   const handleGenerateBills = async () => {
     try {
       setLoading(true);
-      // This will trigger the backend to create payment records
       await api.post("/payments/generate-monthly", {
         month: currentMonth,
         defaultFee: 5000,
@@ -91,7 +119,7 @@ const DriverPaymentScreen = ({ navigation }) => {
         "Success 🎉",
         "Bills generated successfully for all students!",
       );
-      fetchPayments(); // Refresh to show new bills
+      fetchPayments();
     } catch (error) {
       console.error("Error generating bills:", error);
       Alert.alert("Error", "Could not generate bills.");
@@ -147,7 +175,7 @@ const DriverPaymentScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* --- NEW: Generate Bills Button (Always Visible) --- */}
+          {/* Generate Bills Button */}
           <TouchableOpacity
             onPress={handleGenerateBills}
             className="bg-blue-600 p-3 rounded-xl shadow-sm flex-row items-center justify-center mt-2 active:bg-blue-700"

@@ -60,6 +60,14 @@ io.on("connection", (socket) => {
     io.emit(`journeyEnded_${data.driverId}`);
   });
 
+  // --- Listen for Payment Success Signals from Parents ---
+  socket.on("paymentMade", (data) => {
+    console.log("Payment received! Notifying driver ID:", data.driverId);
+
+    // Send a signal ONLY to the specific driver to refresh their app
+    io.emit(`refreshPayments_${data.driverId}`);
+  });
+
   socket.on("disconnect", () => {
     console.log("User disconnected", socket.id);
   });

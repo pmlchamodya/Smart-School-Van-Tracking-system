@@ -21,7 +21,7 @@ const ParentPaymentScreen = ({ navigation }) => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // --- Fetch Payments ---
+  // --- Fetch Payments from Backend ---
   const fetchPayments = async () => {
     try {
       setLoading(true);
@@ -38,59 +38,26 @@ const ParentPaymentScreen = ({ navigation }) => {
     }
   };
 
+  // --- Reload data when screen is focused ---
   useFocusEffect(
     useCallback(() => {
       fetchPayments();
     }, []),
   );
 
-  // --- Simulated Card Payment Flow ---
-  const handlePayNow = (paymentId, amount, month) => {
-    // 1. Show a confirmation dialog (Simulating a Payment Gateway popping up)
-    Alert.alert(
-      "Secure Payment gateway",
-      `Pay Rs. ${amount} for ${month} via Credit/Debit Card?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Proceed to Pay",
-          onPress: () => simulatePaymentProcessing(paymentId),
-        },
-      ],
-    );
-  };
-
-  const simulatePaymentProcessing = (paymentId) => {
-    // 2. Simulate loading/processing time
-    Alert.alert(
-      "Processing...",
-      "Please wait while we securely process your card.",
-      [],
-      { cancelable: false },
-    );
-
-    setTimeout(async () => {
-      try {
-        // 3. Mark as Paid in Backend with Method: "Card"
-        await api.put(`/payments/mark-paid/${paymentId}`, {
-          paymentMethod: "Card",
-        });
-
-        // 4. Show E-Receipt Success Message
-        Alert.alert(
-          "Payment Successful! 🎉",
-          "Your E-Receipt has been generated and the driver has been notified.",
-        );
-        fetchPayments(); // Refresh list to show as Paid
-      } catch (error) {
-        Alert.alert("Payment Failed", "Something went wrong. Try again.");
-      }
-    }, 2000); // 2 seconds fake delay to look like real processing
+  // --- Navigate to Secure Payment Gateway ---
+  const handlePayNow = (paymentId, amount, month, driverId) => {
+    navigation.navigate("PaymentGateway", {
+      paymentId: paymentId,
+      amount: amount,
+      month: month,
+      driverId: driverId,
+    });
   };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      {/* Header */}
+      {/* Header Section */}
       <View className="flex-row items-center p-5 bg-blue-600 rounded-b-3xl shadow-md">
         <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
           <Ionicons name="arrow-back" size={28} color="white" />
@@ -180,7 +147,12 @@ const ParentPaymentScreen = ({ navigation }) => {
                 ) : (
                   <TouchableOpacity
                     onPress={() =>
-                      handlePayNow(payment._id, payment.amount, payment.month)
+                      handlePayNow(
+                        payment._id,
+                        payment.amount,
+                        payment.month,
+                        payment.driverId,
+                      )
                     }
                     className="bg-blue-600 px-5 py-2 rounded-xl shadow-md"
                   >

@@ -16,10 +16,8 @@ import api from "../../services/api";
 
 // --- SOCKET CONNECTION ---
 // THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
-// const socket = io("http://192.168.1.3:5000", {
-//   transports: ["websocket"],
-// });
-const socket = io("http://10.16.139.205:5000", {
+const socket = io("http://192.168.1.3:5000", {
+  //const socket = io("http://10.16.139.205:5000", {
   transports: ["websocket"],
 });
 
@@ -33,6 +31,7 @@ const ParentMapScreen = ({ navigation }) => {
   });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("Waiting for driver...");
+  const [isJourneyActive, setIsJourneyActive] = useState(false);
 
   // --- Setup Real-time Tracking ---
   useEffect(() => {
@@ -65,8 +64,16 @@ const ParentMapScreen = ({ navigation }) => {
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             });
+            setIsJourneyActive(true);
             setLoading(false);
             setStatus("Live Tracking Active");
+          });
+          // Listen for journey end event
+          socket.on(`journeyEnded_${driverId}`, () => {
+            console.log("Driver ended the journey");
+            setIsJourneyActive(false);
+            setStatus("Journey Ended / Offline");
+            setLoading(false);
           });
         } else {
           setLoading(false);
@@ -95,20 +102,22 @@ const ParentMapScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <MapView style={styles.map} provider={PROVIDER_GOOGLE} region={region}>
-        {/* Driver/Van Marker */}
-        <Marker
-          coordinate={region}
-          title="School Van"
-          anchor={{ x: 0.5, y: 0.5 }}
-        >
-          <View className="bg-blue-600 p-2 rounded-full border-2 border-white shadow-lg">
-            <MaterialCommunityIcons
-              name="van-passenger"
-              size={24}
-              color="white"
-            />
-          </View>
-        </Marker>
+        {/* Driver/Van Marker - Only render if journey is active */}
+        {isJourneyActive && (
+          <Marker
+            coordinate={region}
+            title="School Van"
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View className="bg-blue-600 p-2 rounded-full border-2 border-white shadow-lg">
+              <MaterialCommunityIcons
+                name="van-passenger"
+                size={24}
+                color="white"
+              />
+            </View>
+          </Marker>
+        )}
       </MapView>
 
       {/* Floating Back Button */}

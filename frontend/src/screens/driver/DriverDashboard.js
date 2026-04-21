@@ -16,6 +16,7 @@ import {
   Ionicons,
   FontAwesome5,
   MaterialCommunityIcons,
+  MaterialIcons,
 } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,10 +24,10 @@ import io from "socket.io-client";
 
 // --- SOCKET CONNECTION ---
 // THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
-// const socket = io("http://192.168.1.3:5000", {
-//   transports: ["websocket"],
-// });
-const socket = io("http://10.16.139.205:5000", {
+const socket = io("http://192.168.1.3:5000", {
+  //   transports: ["websocket"],
+  // });
+  //const socket = io("http://10.16.139.205:5000", {
   transports: ["websocket"],
 });
 
@@ -163,6 +164,24 @@ const DriverDashboard = ({ navigation }) => {
     }, []),
   );
 
+  // Listen for Live Attendance Updates ---
+  useEffect(() => {
+    if (driverId) {
+      socket.on(`refreshDriver_${driverId}`, () => {
+        console.log(
+          "Live Update: Parent changed attendance! Fetching new data...",
+        );
+        loadDriverData();
+      });
+    }
+
+    return () => {
+      if (driverId) {
+        socket.off(`refreshDriver_${driverId}`);
+      }
+    };
+  }, [driverId]);
+
   // --- Toggle Student Status ---
   const toggleStudentStatus = async (childId, currentStatus) => {
     let newStatus =
@@ -176,7 +195,7 @@ const DriverDashboard = ({ navigation }) => {
       setStudents((prev) =>
         prev.map((c) => (c._id === childId ? { ...c, status: newStatus } : c)),
       );
-      Alert.alert("Success", `Status updated to: ${newStatus}`);
+      // Alert.alert("Success", `Status updated to: ${newStatus}`);
     } catch (error) {
       Alert.alert("Error", "Failed to update status");
     }
@@ -186,7 +205,16 @@ const DriverDashboard = ({ navigation }) => {
   const toggleJourney = () => {
     if (isJourneyStarted) {
       Alert.alert("End Journey", "Are you sure you want to end the journey?", [
-        { text: "Yes", onPress: () => setIsJourneyStarted(false) },
+        {
+          text: "Yes",
+          onPress: () => {
+            setIsJourneyStarted(false); // Stop tracking
+            // Send journey ended signal to backend
+            if (driverId) {
+              socket.emit("journeyEnded", { driverId: driverId });
+            }
+          },
+        },
         { text: "Cancel", style: "cancel" },
       ]);
     } else {
@@ -286,6 +314,29 @@ const DriverDashboard = ({ navigation }) => {
           />
         </View>
 
+        {/* --- Financial / Payments Button --- */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("DriverPayments")}
+          className="bg-green-600 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-6"
+        >
+          <View className="flex-row items-center">
+            <MaterialIcons
+              name="account-balance-wallet"
+              size={28}
+              color="white"
+            />
+            <View className="ml-3">
+              <Text className="text-white font-bold text-lg">
+                Manage Payments
+              </Text>
+              <Text className="text-green-100 text-xs">
+                View bills & collect cash
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="white" />
+        </TouchableOpacity>
+
         {/* --- Journey Control Button --- */}
         <TouchableOpacity
           onPress={toggleJourney}
@@ -308,45 +359,72 @@ const DriverDashboard = ({ navigation }) => {
           students.map((child) => (
             <View
               key={child._id}
-              className="bg-white p-4 rounded-xl mb-3 flex-row justify-between items-center shadow-sm"
+              className={`p-4 rounded-xl mb-3 flex-row justify-between items-center shadow-sm border-l-4 ${
+                child.isAbsent
+                  ? "bg-red-50 border-red-500" // Absent Styling
+                  : "bg-white border-blue-500" // Normal Styling
+              }`}
             >
-              <View>
-                <Text className="text-lg font-bold text-gray-800">
-                  {child.name}
-                </Text>
+              <View className="flex-1">
+                <View className="flex-row items-center mb-1">
+                  <Text className="text-lg font-bold text-gray-800 mr-2">
+                    {child.name}
+                  </Text>
+                  {/* --- NEW: Show Absent Badge if isAbsent is true --- */}
+                  {child.isAbsent && (
+                    <View className="bg-red-100 px-2 py-0.5 rounded-md border border-red-300">
+                      <Text className="text-red-700 font-bold text-xs">
+                        🔴 ABSENT
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
                 <Text className="text-gray-500 text-xs">{child.school}</Text>
-                <View
-                  className={`px-2 py-1 rounded-md mt-1 self-start ${
-                    child.status === "in-van"
-                      ? "bg-yellow-100"
-                      : child.status === "safe"
-                        ? "bg-green-100"
-                        : "bg-gray-100"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-bold capitalize ${
+
+                {/* --- Status Label --- */}
+                {!child.isAbsent ? (
+                  <View
+                    className={`px-2 py-1 rounded-md mt-2 self-start ${
                       child.status === "in-van"
-                        ? "text-yellow-700"
+                        ? "bg-yellow-100"
                         : child.status === "safe"
-                          ? "text-green-700"
-                          : "text-gray-600"
+                          ? "bg-green-100"
+                          : "bg-gray-100"
                     }`}
                   >
-                    {child.status}
+                    <Text
+                      className={`text-xs font-bold capitalize ${
+                        child.status === "in-van"
+                          ? "text-yellow-700"
+                          : child.status === "safe"
+                            ? "text-green-700"
+                            : "text-gray-600"
+                      }`}
+                    >
+                      {child.status}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text className="text-red-500 text-xs font-medium mt-2">
+                    Will not attend today.
                   </Text>
-                </View>
+                )}
               </View>
-              <TouchableOpacity
-                onPress={() => toggleStudentStatus(child._id, child.status)}
-                className="bg-blue-100 p-3 rounded-full"
-              >
-                <FontAwesome5
-                  name={child.status === "in-van" ? "walking" : "bus"}
-                  size={20}
-                  color="#2563EB"
-                />
-              </TouchableOpacity>
+
+              {/* --- NEW: Hide Action Button if Absent --- */}
+              {!child.isAbsent && (
+                <TouchableOpacity
+                  onPress={() => toggleStudentStatus(child._id, child.status)}
+                  className="bg-blue-100 p-3 rounded-full ml-2"
+                >
+                  <FontAwesome5
+                    name={child.status === "in-van" ? "walking" : "bus"}
+                    size={20}
+                    color="#2563EB"
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           ))
         )}

@@ -147,6 +147,10 @@ const DriverProfileScreen = ({ navigation }) => {
         </View>
 
         {/* Settings */}
+        <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
+          Account Settings
+        </Text>
+
         <TouchableOpacity
           onPress={() => navigation.navigate("EditDriverProfile")}
           className="bg-gray-50 p-4 rounded-xl mb-3 flex-row justify-between items-center"
@@ -158,6 +162,20 @@ const DriverProfileScreen = ({ navigation }) => {
             <Text className="text-gray-700 font-semibold">
               Edit Personal Details
             </Text>
+          </View>
+          <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
+        </TouchableOpacity>
+
+        {/* Change Password Button */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("ChangePassword")}
+          className="bg-gray-50 p-4 rounded-xl mb-3 flex-row justify-between items-center"
+        >
+          <View className="flex-row items-center">
+            <View className="bg-white p-2 rounded-full mr-3 shadow-sm">
+              <Ionicons name="lock-closed" size={18} color="#4B5563" />
+            </View>
+            <Text className="text-gray-700 font-semibold">Change Password</Text>
           </View>
           <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
         </TouchableOpacity>

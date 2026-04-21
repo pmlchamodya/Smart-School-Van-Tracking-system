@@ -22,6 +22,7 @@ import ParentMapScreen from "./src/screens/parent/ParentMapScreen";
 import FindDriverScreen from "./src/screens/driver/FindDriverScreen";
 import DriverPaymentScreen from "./src/screens/driver/DriverPaymentScreen";
 import ParentPaymentScreen from "./src/screens/parent/ParentPaymentScreen";
+import PaymentGatewayScreen from "./src/screens/parent/PaymentGatewayScreen";
 
 const Stack = createStackNavigator();
 
@@ -139,6 +140,13 @@ export default function App() {
           <Stack.Screen
             name="ParentPayments"
             component={ParentPaymentScreen}
+            options={{ headerShown: false }}
+          />
+
+          {/* Define the Payment Gateway Screen */}
+          <Stack.Screen
+            name="PaymentGateway"
+            component={PaymentGatewayScreen}
             options={{ headerShown: false }}
           />
 

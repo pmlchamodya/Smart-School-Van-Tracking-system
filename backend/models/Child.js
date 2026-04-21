@@ -33,6 +33,10 @@ const ChildSchema = new mongoose.Schema({
     enum: ["safe", "in-van", "school", "dropped"],
     default: "safe",
   },
+  isAbsent: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
