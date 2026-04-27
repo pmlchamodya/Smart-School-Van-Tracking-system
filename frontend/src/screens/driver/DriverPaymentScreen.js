@@ -185,6 +185,17 @@ const DriverPaymentScreen = ({ navigation }) => {
               Generate Bills (Rs. 5000)
             </Text>
           </TouchableOpacity>
+
+          {/* --- View Detailed Report Button --- */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("IncomeReport")}
+            className="bg-gray-800 p-3 rounded-xl shadow-sm flex-row items-center justify-center mt-3 active:bg-gray-900"
+          >
+            <MaterialIcons name="analytics" size={20} color="white" />
+            <Text className="text-white font-bold ml-2">
+              View Monthly Income Report
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Payments List */}

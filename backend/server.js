@@ -5,6 +5,11 @@ const connectDB = require("./config/db");
 const http = require("http");
 const { Server } = require("socket.io");
 
+// Models
+const cron = require("node-cron");
+const Payment = require("./models/Payment");
+const Child = require("./models/Child");
+
 // Route Imports
 const userRoutes = require("./routes/userRoutes");
 const childRoutes = require("./routes/childRoutes");
@@ -74,6 +79,49 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// --- AUTOMATED MONTHLY BILL GENERATION (CRON JOB) ---
+// This runs automatically at 12:00 AM on the 1st of every month
+cron.schedule("0 0 1 * *", async () => {
+  console.log("⏰ CRON JOB STARTED: Generating Monthly Bills...");
+  try {
+    const today = new Date();
+    // Get current month in "YYYY-MM" format
+    const currentMonth = today.toISOString().slice(0, 7);
+    const DEFAULT_FEE = 5000;
+
+    // Find all children who have a driver assigned
+    const children = await Child.find({ driver_id: { $ne: null } });
+    let createdCount = 0;
+
+    for (const child of children) {
+      // Check if a bill already exists for this month
+      const existingPayment = await Payment.findOne({
+        childId: child._id,
+        month: currentMonth,
+      });
+
+      if (!existingPayment) {
+        // Create new bill
+        await Payment.create({
+          childId: child._id,
+          childName: child.name,
+          parentId: child.parent_id,
+          driverId: child.driver_id,
+          month: currentMonth,
+          amount: DEFAULT_FEE,
+          status: "Pending",
+        });
+        createdCount++;
+      }
+    }
+    console.log(
+      `✅ CRON JOB SUCCESS: Generated ${createdCount} bills for ${currentMonth}`,
+    );
+  } catch (error) {
+    console.error("❌ CRON JOB ERROR: Failed to generate bills", error);
+  }
+});
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

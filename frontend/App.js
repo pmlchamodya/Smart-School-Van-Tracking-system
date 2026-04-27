@@ -23,6 +23,8 @@ import FindDriverScreen from "./src/screens/driver/FindDriverScreen";
 import DriverPaymentScreen from "./src/screens/driver/DriverPaymentScreen";
 import ParentPaymentScreen from "./src/screens/parent/ParentPaymentScreen";
 import PaymentGatewayScreen from "./src/screens/parent/PaymentGatewayScreen";
+import IncomeReportScreen from "./src/screens/driver/IncomeReportScreen";
+import LocationPickerScreen from "./src/screens/parent/LocationPickerScreen";
 
 const Stack = createStackNavigator();
 
@@ -85,7 +87,12 @@ export default function App() {
             component={FindDriverScreen}
             options={{ headerShown: false }}
           />
-
+          {/* Define the Income Report Screen */}
+          <Stack.Screen
+            name="IncomeReport"
+            component={IncomeReportScreen}
+            options={{ headerShown: false }}
+          />
           {/* Define the Parent Dashboard Screen */}
           <Stack.Screen
             name="ParentDashboard"
@@ -128,6 +135,12 @@ export default function App() {
             name="ParentMap"
             component={ParentMapScreen}
             options={{ headerShown: false }}
+          />
+          {/* Define the Location Picker Screen */}
+          <Stack.Screen
+            name="LocationPicker"
+            component={LocationPickerScreen}
+            options={{ title: "Select Location", headerShown: false }}
           />
           {/* Define the Driver Payment Screen */}
           <Stack.Screen

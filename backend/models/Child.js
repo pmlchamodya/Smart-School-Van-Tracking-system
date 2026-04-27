@@ -12,6 +12,10 @@ const ChildSchema = new mongoose.Schema({
     ref: "User",
     required: false,
   },
+  driverAssignedAt: {
+    type: Date,
+    default: null,
+  },
   name: {
     type: String,
     required: true,
@@ -27,6 +31,16 @@ const ChildSchema = new mongoose.Schema({
   pickupLocation: {
     type: String,
     required: false,
+  },
+  location: {
+    latitude: {
+      type: Number,
+      required: false,
+    },
+    longitude: {
+      type: Number,
+      required: false,
+    },
   },
   status: {
     type: String,

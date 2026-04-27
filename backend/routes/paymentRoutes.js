@@ -2,13 +2,14 @@ const express = require("express");
 const router = express.Router();
 const Payment = require("../models/Payment");
 const Child = require("../models/Child");
+const User = require("../models/User");
+const sendEmail = require("../utils/sendEmail");
 
-// 1. Generate Monthly Fees (Can be run by Admin or a Scheduler)
-// P.S: Ideally, this should run automatically on the 1st of every month using a cron job.
-// For now, we make a manual route to test it.
+// 1. Generate Monthly Fees
+// Automatically creates pending bills for all children with an assigned driver
 router.post("/generate-monthly", async (req, res) => {
   try {
-    const { month, defaultFee } = req.body; // e.g., month: "2026-04", defaultFee: 5000
+    const { month, defaultFee } = req.body;
 
     if (!month || !defaultFee) {
       return res
@@ -35,7 +36,7 @@ router.post("/generate-monthly", async (req, res) => {
           parentId: child.parent_id,
           driverId: child.driver_id,
           month: month,
-          amount: defaultFee, // We can customize this per child later if needed
+          amount: defaultFee,
           status: "Pending",
         });
         createdCount++;
@@ -51,24 +52,60 @@ router.post("/generate-monthly", async (req, res) => {
   }
 });
 
-// 2. Mark a Payment as Paid
+// 2. Mark a Payment as Paid & Send E-Receipt
 router.put("/mark-paid/:paymentId", async (req, res) => {
   try {
-    const { paymentMethod } = req.body; // e.g., "Cash", "Card"
+    const { paymentMethod } = req.body;
 
-    const payment = await Payment.findById(req.params.paymentId);
+    // Find the payment and populate parent details to fetch the email address
+    const payment = await Payment.findById(req.params.paymentId).populate(
+      "parentId",
+    );
     if (!payment)
       return res.status(404).json({ message: "Payment record not found" });
 
+    // Update payment status and details
     payment.status = "Paid";
     payment.paymentMethod = paymentMethod || "Cash";
-    payment.paidAt = new Date(); // Sets current date and time
+    payment.paidAt = new Date();
 
     await payment.save();
 
-    res
-      .status(200)
-      .json({ message: "Payment successfully marked as Paid!", payment });
+    // --- Send E-Receipt via Email ---
+    if (payment.parentId && payment.parentId.email) {
+      const parentName = payment.parentId.name;
+      const parentEmail = payment.parentId.email;
+
+      const receiptHTML = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px; max-width: 500px; margin: auto;">
+          <h2 style="color: #2563EB; text-align: center;">Payment Receipt</h2>
+          <p>Dear <strong>${parentName}</strong>,</p>
+          <p>Thank you for your payment. Here are your transaction details:</p>
+          <hr style="border: 0; border-top: 1px solid #eee;" />
+          <ul style="list-style-type: none; padding: 0;">
+            <li style="margin-bottom: 10px;"><strong>Student Name:</strong> ${payment.childName}</li>
+            <li style="margin-bottom: 10px;"><strong>Month:</strong> ${payment.month}</li>
+            <li style="margin-bottom: 10px;"><strong>Amount Paid:</strong> Rs. ${payment.amount}</li>
+            <li style="margin-bottom: 10px;"><strong>Payment Method:</strong> ${payment.paymentMethod}</li>
+            <li style="margin-bottom: 10px;"><strong>Date:</strong> ${payment.paidAt.toLocaleString()}</li>
+          </ul>
+          <hr style="border: 0; border-top: 1px solid #eee;" />
+          <p style="text-align: center; color: #10B981; font-weight: bold;">Status: PAID ✅</p>
+          <p style="font-size: 12px; color: #888; text-align: center;">This is an automatically generated e-receipt from the Smart School Van System.</p>
+        </div>
+      `;
+
+      sendEmail({
+        email: parentEmail,
+        subject: `Payment Receipt - ${payment.childName} (${payment.month})`,
+        html: receiptHTML,
+      });
+    }
+
+    res.status(200).json({
+      message: "Payment successfully marked as Paid and receipt sent!",
+      payment,
+    });
   } catch (error) {
     console.error("Error updating payment:", error);
     res.status(500).json({ message: "Server error updating payment" });
@@ -80,10 +117,10 @@ router.get("/driver/:driverId/:month", async (req, res) => {
   try {
     const { driverId, month } = req.params;
 
-    // Fetch payments and 'populate' child and parent details to show names in the app
+    // Fetch payments and populate child and parent details for the frontend
     const payments = await Payment.find({ driverId, month })
-      .populate("childId", "name school") // Get child's name and school
-      .populate("parentId", "name phoneNumber"); // Get parent's name and number
+      .populate("childId", "name school")
+      .populate("parentId", "name phoneNumber");
 
     res.status(200).json(payments);
   } catch (error) {
@@ -96,6 +133,7 @@ router.get("/driver/:driverId/:month", async (req, res) => {
 router.get("/parent/:parentId", async (req, res) => {
   try {
     const { parentId } = req.params;
+
     // Get all payments for this parent, sorted by newest first
     const payments = await Payment.find({ parentId: parentId })
       .populate("childId", "name school")

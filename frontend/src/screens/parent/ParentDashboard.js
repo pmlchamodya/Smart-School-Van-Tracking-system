@@ -21,7 +21,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import io from "socket.io-client";
 
 // --- SOCKET CONNECTION ---
-// THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
 const socket = io("http://192.168.1.3:5000", {
   transports: ["websocket"],
 });
@@ -57,12 +56,10 @@ const ParentDashboard = ({ navigation }) => {
   // --- Toggle Attendance Function ---
   const toggleAttendance = async (childId, currentIsAbsent) => {
     try {
-      // Send PUT request to update attendance status in the backend
-      const response = await api.put(`/children/attendance/${childId}`, {
-        isAbsent: !currentIsAbsent, // Toggle the current boolean value
+      await api.put(`/children/attendance/${childId}`, {
+        isAbsent: !currentIsAbsent,
       });
 
-      // Update the local state to show changes instantly without refreshing the screen
       setChildren((prevChildren) =>
         prevChildren.map((child) =>
           child._id === childId
@@ -70,35 +67,30 @@ const ParentDashboard = ({ navigation }) => {
             : child,
         ),
       );
-      // Emit Socket Event to notify the driver about attendance change
+
       const targetChild = children.find((c) => c._id === childId);
       if (targetChild && targetChild.driver_id) {
         socket.emit("attendanceUpdated", { driverId: targetChild.driver_id });
       }
-
-      // Show success message
-      // Alert.alert("Success", response.data.message); // (Optional: Commented out to prevent annoying popups every time)
     } catch (error) {
       console.error("Attendance Update Error:", error);
       Alert.alert("Error", "Could not update attendance. Try again.");
     }
   };
 
-  // --- Reload data on screen focus ---
   useFocusEffect(
     useCallback(() => {
       loadData();
     }, []),
   );
 
-  // --- Pull to Refresh Function ---
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
   };
 
-  // --- Delete Child Logic ---
+  // --- Delete Child Logic (UPDATED) ---
   const handleDeleteChild = (childId) => {
     Alert.alert("Delete Child", "Are you sure you want to remove this child?", [
       { text: "Cancel", style: "cancel" },
@@ -111,8 +103,17 @@ const ParentDashboard = ({ navigation }) => {
             Alert.alert("Success", "Child removed successfully");
             loadData();
           } catch (error) {
-            console.log(error);
-            Alert.alert("Error", "Failed to delete child");
+            // --- NEW: Catch the specific backend error for Pending Payments ---
+            if (
+              error.response &&
+              error.response.data &&
+              error.response.data.message
+            ) {
+              Alert.alert("Cannot Remove ❌", error.response.data.message);
+            } else {
+              console.log(error);
+              Alert.alert("Error", "Failed to delete child");
+            }
           }
         },
       },
@@ -244,7 +245,6 @@ const ParentDashboard = ({ navigation }) => {
                       </Text>
                     </View>
                   ) : (
-                    // Show "Find Transport" Button
                     <TouchableOpacity
                       onPress={() =>
                         navigation.navigate("FindDriver", { child: child })
@@ -283,7 +283,6 @@ const ParentDashboard = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* --- Attendance Toggle Button (Tailwind Version) --- */}
               <TouchableOpacity
                 className={`mt-4 py-3 px-4 rounded-xl items-center justify-center border ${
                   child.isAbsent

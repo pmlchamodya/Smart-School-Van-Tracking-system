@@ -1,8 +1,9 @@
 import { io } from "socket.io-client";
 
 // Your exact computer IP
-const SOCKET_URL = "http://192.168.1.3:5000";
-const SOCKET_URL2 = "http://192.168.1.100:5000";
+//const SOCKET_URL = "http://192.168.1.3:5000";
+//const SOCKET_URL = "http://192.168.1.100:5000";
+const SOCKET_URL = "http://172.20.10.2:5000";
 
 const socket = io(SOCKET_URL, {
   transports: ["websocket"],
