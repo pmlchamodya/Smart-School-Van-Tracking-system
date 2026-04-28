@@ -25,6 +25,9 @@ import ParentPaymentScreen from "./src/screens/parent/ParentPaymentScreen";
 import PaymentGatewayScreen from "./src/screens/parent/PaymentGatewayScreen";
 import IncomeReportScreen from "./src/screens/driver/IncomeReportScreen";
 import LocationPickerScreen from "./src/screens/parent/LocationPickerScreen";
+import ManageDriversScreen from "./src/screens/admin/ManageDriversScreen";
+import ManageParentsScreen from "./src/screens/admin/ManageParentsScreen";
+import ManageStudentsScreen from "./src/screens/admin/ManageStudentsScreen";
 
 const Stack = createStackNavigator();
 
@@ -49,6 +52,24 @@ export default function App() {
           <Stack.Screen
             name="AdminDashboard"
             component={AdminDashboard}
+            options={{ headerShown: false }}
+          />
+          {/* Define the Manage Drivers Screen */}
+          <Stack.Screen
+            name="ManageDrivers"
+            component={ManageDriversScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Define the Manage Parents Screen */}
+          <Stack.Screen
+            name="ManageParents"
+            component={ManageParentsScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Define the Manage Students Screen */}
+          <Stack.Screen
+            name="ManageStudents"
+            component={ManageStudentsScreen}
             options={{ headerShown: false }}
           />
           {/* Define the Driver Dashboard Screen */}

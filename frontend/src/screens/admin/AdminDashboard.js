@@ -1,17 +1,53 @@
 import { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
+import api from "../../services/api"; // Import your API instance
 
 const AdminDashboard = ({ navigation }) => {
   const [adminName, setAdminName] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  // State to hold the real statistics from the database
+  const [stats, setStats] = useState({
+    drivers: 0,
+    parents: 0,
+    vans: 0,
+    students: 0,
+  });
 
   useEffect(() => {
-    const getUserData = async () => {
-      const name = await AsyncStorage.getItem("userName");
-      if (name) setAdminName(name);
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        // Get Admin Name
+        const name = await AsyncStorage.getItem("userName");
+        if (name) setAdminName(name);
+
+        // Fetch Live Stats from Backend
+        const response = await api.get("/users/admin/stats");
+        setStats({
+          drivers: response.data.driversCount,
+          parents: response.data.parentsCount,
+          students: response.data.studentsCount,
+          vans: response.data.vansCount,
+        });
+      } catch (error) {
+        console.error("Failed to load admin stats", error);
+        Alert.alert("Error", "Could not load system statistics.");
+      } finally {
+        setLoading(false);
+      }
     };
-    getUserData();
+
+    loadDashboardData();
   }, []);
 
   const handleLogout = async () => {
@@ -33,45 +69,60 @@ const AdminDashboard = ({ navigation }) => {
             </Text>
           </View>
           {/* Profile Icon Placeholder */}
-          <View className="w-12 h-12 bg-blue-500 rounded-full items-center justify-center">
+          <View className="w-12 h-12 bg-blue-500 rounded-full items-center justify-center shadow-sm">
             <Text className="text-white text-xl font-bold">A</Text>
           </View>
         </View>
 
-        {/* --- Stats Cards (Grid Layout) --- */}
-        <View className="flex-row flex-wrap justify-between mb-6">
-          {/* Card 1: Drivers */}
-          <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-blue-500 mb-4">
-            <Text className="text-gray-400 text-xs font-bold uppercase">
-              Drivers
-            </Text>
-            <Text className="text-3xl font-bold text-gray-800 mt-1">12</Text>
+        {/* --- Stats Cards (Live Data) --- */}
+        {loading ? (
+          <View className="items-center justify-center py-10">
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text className="text-gray-500 mt-2">Loading Live Stats...</Text>
           </View>
+        ) : (
+          <View className="flex-row flex-wrap justify-between mb-6">
+            {/* Card 1: Drivers */}
+            <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-blue-500 mb-4">
+              <Text className="text-gray-400 text-xs font-bold uppercase">
+                Drivers
+              </Text>
+              <Text className="text-3xl font-bold text-gray-800 mt-1">
+                {stats.drivers}
+              </Text>
+            </View>
 
-          {/* Card 2: Parents */}
-          <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-green-500 mb-4">
-            <Text className="text-gray-400 text-xs font-bold uppercase">
-              Parents
-            </Text>
-            <Text className="text-3xl font-bold text-gray-800 mt-1">45</Text>
-          </View>
+            {/* Card 2: Parents */}
+            <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-green-500 mb-4">
+              <Text className="text-gray-400 text-xs font-bold uppercase">
+                Parents
+              </Text>
+              <Text className="text-3xl font-bold text-gray-800 mt-1">
+                {stats.parents}
+              </Text>
+            </View>
 
-          {/* Card 3: Vans */}
-          <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-orange-500 mb-4">
-            <Text className="text-gray-400 text-xs font-bold uppercase">
-              Active Vans
-            </Text>
-            <Text className="text-3xl font-bold text-gray-800 mt-1">8</Text>
-          </View>
+            {/* Card 3: Vans */}
+            <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-orange-500 mb-4">
+              <Text className="text-gray-400 text-xs font-bold uppercase">
+                Active Vans
+              </Text>
+              <Text className="text-3xl font-bold text-gray-800 mt-1">
+                {stats.vans}
+              </Text>
+            </View>
 
-          {/* Card 4: Students */}
-          <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-purple-500 mb-4">
-            <Text className="text-gray-400 text-xs font-bold uppercase">
-              Students
-            </Text>
-            <Text className="text-3xl font-bold text-gray-800 mt-1">120</Text>
+            {/* Card 4: Students */}
+            <View className="w-[48%] bg-white p-5 rounded-2xl shadow-sm border-l-4 border-purple-500 mb-4">
+              <Text className="text-gray-400 text-xs font-bold uppercase">
+                Students
+              </Text>
+              <Text className="text-3xl font-bold text-gray-800 mt-1">
+                {stats.students}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* --- Quick Actions Menu --- */}
         <Text className="text-lg font-bold text-gray-800 mb-4">
@@ -79,7 +130,11 @@ const AdminDashboard = ({ navigation }) => {
         </Text>
 
         <View className="bg-white rounded-2xl p-2 shadow-sm mb-6">
-          <TouchableOpacity className="flex-row items-center p-4 border-b border-gray-100">
+          {/* Manage Drivers Button */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ManageDrivers")}
+            className="flex-row items-center p-4 border-b border-gray-100"
+          >
             <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center mr-4">
               <Text className="text-blue-600 font-bold">D</Text>
             </View>
@@ -93,7 +148,11 @@ const AdminDashboard = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity className="flex-row items-center p-4">
+          {/* Manage Parents Button */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ManageParents")}
+            className="flex-row items-center p-4 border-b border-gray-100"
+          >
             <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center mr-4">
               <Text className="text-green-600 font-bold">P</Text>
             </View>
@@ -103,6 +162,24 @@ const AdminDashboard = ({ navigation }) => {
               </Text>
               <Text className="text-xs text-gray-500">
                 View registered parents
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Manage Students Button */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ManageStudents")}
+            className="flex-row items-center p-4"
+          >
+            <View className="w-10 h-10 bg-purple-100 rounded-full items-center justify-center mr-4">
+              <Text className="text-purple-600 font-bold">S</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-semibold text-gray-800">
+                Manage Students
+              </Text>
+              <Text className="text-xs text-gray-500">
+                View all registered children
               </Text>
             </View>
           </TouchableOpacity>

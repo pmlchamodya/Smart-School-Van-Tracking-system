@@ -26,7 +26,7 @@ const ParentDashboard = ({ navigation }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // --- NEW: Socket Listeners for Real-time Push Notifications ---
+  // --- Socket Listeners for Real-time Foreground Notifications ---
   useEffect(() => {
     const setupSocket = async () => {
       const userId = await AsyncStorage.getItem("userId");
@@ -37,7 +37,6 @@ const ParentDashboard = ({ navigation }) => {
 
         // 2. Listen for incoming notifications from the driver
         socket.on("receive_notification", (data) => {
-          // Trigger a pop-up alert automatically
           Alert.alert(data.title, data.message, [
             { text: "Awesome! Thanks 👍" },
           ]);

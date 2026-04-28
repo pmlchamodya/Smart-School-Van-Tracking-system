@@ -24,6 +24,10 @@ const userSchema = mongoose.Schema(
     address: { type: String },
     emergencyContact: { type: String },
 
+    // --- NEW: Expo Push Token for Background Notifications ---
+    // This will store the Expo Push Token for the user, allowing us to send them notifications even when the app is closed.
+    pushToken: { type: String, default: null },
+
     // --- Driver Specific Identification ---
     nic: { type: String },
     licenseNumber: { type: String },
@@ -56,7 +60,7 @@ const userSchema = mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Middleware: Hash password before saving
