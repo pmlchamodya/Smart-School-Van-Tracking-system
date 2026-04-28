@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,19 +17,41 @@ import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import api from "../../services/api";
+import socket from "../../services/socket";
 import { useFocusEffect } from "@react-navigation/native";
-import io from "socket.io-client";
-
-// --- SOCKET CONNECTION ---
-const socket = io("http://192.168.1.3:5000", {
-  transports: ["websocket"],
-});
 
 const ParentDashboard = ({ navigation }) => {
   const [parentName, setParentName] = useState("");
   const [children, setChildren] = useState([]);
   const [profileImage, setProfileImage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // --- NEW: Socket Listeners for Real-time Push Notifications ---
+  useEffect(() => {
+    const setupSocket = async () => {
+      const userId = await AsyncStorage.getItem("userId");
+
+      if (userId) {
+        // 1. Join personal socket room to receive private notifications
+        socket.emit("join", userId);
+
+        // 2. Listen for incoming notifications from the driver
+        socket.on("receive_notification", (data) => {
+          // Trigger a pop-up alert automatically
+          Alert.alert(data.title, data.message, [
+            { text: "Awesome! Thanks 👍" },
+          ]);
+        });
+      }
+    };
+
+    setupSocket();
+
+    // Cleanup when component unmounts
+    return () => {
+      socket.off("receive_notification");
+    };
+  }, []);
 
   // --- Load Data Function ---
   const loadData = async () => {
@@ -90,7 +112,7 @@ const ParentDashboard = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  // --- Delete Child Logic (UPDATED) ---
+  // --- Delete Child Logic ---
   const handleDeleteChild = (childId) => {
     Alert.alert("Delete Child", "Are you sure you want to remove this child?", [
       { text: "Cancel", style: "cancel" },
@@ -103,7 +125,6 @@ const ParentDashboard = ({ navigation }) => {
             Alert.alert("Success", "Child removed successfully");
             loadData();
           } catch (error) {
-            // --- NEW: Catch the specific backend error for Pending Payments ---
             if (
               error.response &&
               error.response.data &&
@@ -223,7 +244,6 @@ const ParentDashboard = ({ navigation }) => {
               className="bg-white p-5 rounded-2xl shadow-sm mb-4 border-l-4 border-blue-500"
             >
               <View className="flex-row justify-between items-start">
-                {/* Child Info */}
                 <View className="flex-1">
                   <Text className="text-xl font-bold text-gray-800">
                     {child.name}
@@ -232,7 +252,6 @@ const ParentDashboard = ({ navigation }) => {
                     {child.school} - {child.grade}
                   </Text>
 
-                  {/* --- Check if Driver is Assigned --- */}
                   {child.driver_id ? (
                     <View className="bg-green-100 px-2 py-1 rounded-md self-start mt-2 flex-row items-center">
                       <Ionicons
@@ -263,7 +282,6 @@ const ParentDashboard = ({ navigation }) => {
                   )}
                 </View>
 
-                {/* --- Action Buttons (Edit/Delete) --- */}
                 <View className="flex-row items-center mt-1">
                   <TouchableOpacity
                     onPress={() =>

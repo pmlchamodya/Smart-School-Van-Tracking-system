@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -10,71 +10,40 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import io from "socket.io-client";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../services/api";
-
-// --- SOCKET CONNECTION ---
-// THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
-const socket = io("http://192.168.1.3:5000", {
-  //const socket = io("http://10.16.139.205:5000", {
-  transports: ["websocket"],
-});
+import socket from "../../services/socket";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ParentMapScreen = ({ navigation }) => {
-  // --- State Variables ---
+  // --- Map and Tracking States ---
   const [region, setRegion] = useState({
     latitude: 6.9271, // Default: Colombo
     longitude: 79.8612,
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+
+  // Separate state specifically for the van's marker
+  const [vanLocation, setVanLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("Waiting for driver...");
-  const [isJourneyActive, setIsJourneyActive] = useState(false);
+  const [driverId, setDriverId] = useState(null);
 
-  // --- Setup Real-time Tracking ---
+  // Reference to the map to allow smooth animations
+  const mapRef = useRef(null);
+
+  // --- Step 1: Fetch Driver ID on Component Mount ---
   useEffect(() => {
-    let driverId = null;
-
-    const setupTracking = async () => {
+    const fetchDriverDetails = async () => {
       try {
-        // 1. Get Parent User ID
         const userId = await AsyncStorage.getItem("userId");
-
-        // 2. Fetch Children to find the Driver ID
         const childRes = await api.get(`/children/${userId}`);
         const children = childRes.data;
 
         // Check if any child has a driver assigned
-        // (Assuming first child's driver for now)
         if (children.length > 0 && children[0].driver_id) {
-          driverId = children[0].driver_id;
-          console.log("Tracking Driver ID:", driverId);
-          setStatus("Connected to Driver");
-
-          // 3. Listen to Socket Event for this Driver
-          socket.on(`receiveLocation_${driverId}`, (data) => {
-            console.log("New Location Received:", data);
-
-            // Animate map to new location
-            setRegion({
-              latitude: data.latitude,
-              longitude: data.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            });
-            setIsJourneyActive(true);
-            setLoading(false);
-            setStatus("Live Tracking Active");
-          });
-          // Listen for journey end event
-          socket.on(`journeyEnded_${driverId}`, () => {
-            console.log("Driver ended the journey");
-            setIsJourneyActive(false);
-            setStatus("Journey Ended / Offline");
-            setLoading(false);
-          });
+          setDriverId(children[0].driver_id);
+          setStatus("Connected. Waiting for journey to start...");
         } else {
           setLoading(false);
           setStatus("No Driver Assigned");
@@ -84,28 +53,76 @@ const ParentMapScreen = ({ navigation }) => {
           );
         }
       } catch (error) {
-        console.log("Error setup tracking:", error);
+        console.error("Error fetching driver:", error);
         setLoading(false);
       }
     };
 
-    setupTracking();
-
-    // Cleanup when leaving screen
-    return () => {
-      if (driverId) {
-        socket.off(`receiveLocation_${driverId}`);
-      }
-    };
+    fetchDriverDetails();
   }, []);
+
+  // --- Step 2: Setup Socket Listener once Driver ID is found ---
+  useEffect(() => {
+    // Wait until we actually have a driverId before setting up the listener
+    if (!driverId) return;
+
+    console.log("Setting up live tracking for Driver ID:", driverId);
+
+    // Listen for incoming location updates from this specific driver
+    socket.on(`receiveLocation_${driverId}`, (data) => {
+      console.log("Live Location Received:", data.latitude, data.longitude);
+
+      const newCoordinate = {
+        latitude: data.latitude,
+        longitude: data.longitude,
+      };
+
+      // Update the van's marker position
+      setVanLocation(newCoordinate);
+      setLoading(false);
+      setStatus("Live Tracking Active 🚐");
+
+      // Smoothly animate the map camera to follow the van
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(
+          {
+            ...newCoordinate,
+            latitudeDelta: 0.005, // Zoomed in value
+            longitudeDelta: 0.005,
+          },
+          1000,
+        ); // 1-second smooth glide animation
+      }
+    });
+
+    // Listen for journey end signal
+    socket.on(`journeyEnded_${driverId}`, () => {
+      console.log("Driver ended the journey");
+      setVanLocation(null); // Hide the van marker from the map
+      setStatus("Journey Ended / Offline");
+      setLoading(false);
+    });
+
+    // Cleanup listeners when the parent leaves the map screen
+    return () => {
+      socket.off(`receiveLocation_${driverId}`);
+      socket.off(`journeyEnded_${driverId}`);
+    };
+  }, [driverId]); // This effect re-runs only if the driverId changes
 
   return (
     <SafeAreaView style={styles.container}>
-      <MapView style={styles.map} provider={PROVIDER_GOOGLE} region={region}>
-        {/* Driver/Van Marker - Only render if journey is active */}
-        {isJourneyActive && (
+      <MapView
+        ref={mapRef} // Attach the map reference
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={region}
+        showsUserLocation={true}
+      >
+        {/* Render the Van Marker ONLY if we have received a valid location */}
+        {vanLocation && (
           <Marker
-            coordinate={region}
+            coordinate={vanLocation}
             title="School Van"
             anchor={{ x: 0.5, y: 0.5 }}
           >
@@ -128,13 +145,20 @@ const ParentMapScreen = ({ navigation }) => {
         <Ionicons name="arrow-back" size={28} color="black" />
       </TouchableOpacity>
 
-      {/* Van Info Overlay */}
+      {/* Info & Status Overlay */}
       <View style={styles.infoBox}>
-        <Text style={styles.statusText}>Van Status: {status}</Text>
-        {loading && (
-          <View style={{ flexDirection: "row", marginTop: 5 }}>
+        <Text style={styles.statusText}>Status: {status}</Text>
+
+        {/* Show loading indicator while waiting for the first GPS ping */}
+        {loading && driverId && (
+          <View
+            style={{ flexDirection: "row", marginTop: 8, alignItems: "center" }}
+          >
             <ActivityIndicator size="small" color="#2563EB" />
-            <Text style={styles.timeText}> Waiting for signal...</Text>
+            <Text style={styles.timeText}>
+              {" "}
+              Waiting for van's GPS signal...
+            </Text>
           </View>
         )}
       </View>
@@ -170,8 +194,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
-  statusText: { fontSize: 18, fontWeight: "bold", color: "#1F2937" },
-  timeText: { fontSize: 14, color: "#6B7280" },
+  statusText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1F2937",
+  },
+  timeText: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginLeft: 5,
+  },
 });
 
 export default ParentMapScreen;

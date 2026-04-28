@@ -43,6 +43,7 @@ const AddChildScreen = ({ route, navigation }) => {
   // --- Navigate to Map while passing current form state ---
   const handleGoToMap = () => {
     navigation.navigate("LocationPicker", {
+      returnScreen: "AddChild",
       existingData: { name, school, grade, pickupLocation },
       initialLocation: mapLocation, // Pass existing pin if they are editing
     });

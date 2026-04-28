@@ -47,6 +47,23 @@ app.use("/api/payments", paymentRoutes);
 // Socket.io connection
 io.on("connection", (socket) => {
   console.log("New user connected", socket.id);
+
+  // --- NEW: Join a specific room based on User ID ---
+  socket.on("join", (userId) => {
+    console.log(`User ${userId} joined their personal room`);
+    socket.join(userId);
+  });
+
+  // --- NEW: Listen for notifications from Driver and send to specific Parent ---
+  socket.on("notify_parent", (data) => {
+    console.log("Notification sending to parent:", data.parentId);
+    // Emit only to the specific parent's room
+    io.to(data.parentId).emit("receive_notification", {
+      title: data.title,
+      message: data.message,
+    });
+  });
+
   socket.on("sendLocation", (data) => {
     console.log("Location received:", data);
     io.emit(`receiveLocation_${data.driverId}`, data);
@@ -65,10 +82,9 @@ io.on("connection", (socket) => {
     io.emit(`journeyEnded_${data.driverId}`);
   });
 
-  // --- Listen for Payment Success Signals from Parents ---
+  // Listen for Payment Success Signals from Parents
   socket.on("paymentMade", (data) => {
     console.log("Payment received! Notifying driver ID:", data.driverId);
-
     // Send a signal ONLY to the specific driver to refresh their app
     io.emit(`refreshPayments_${data.driverId}`);
   });

@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons"; // NEW: For the Map Icon
 
 const EditChildScreen = ({ route, navigation }) => {
   // Get the child data passed from the dashboard
-  const { child } = route.params;
+  const child = route.params?.child || {};
 
   // Initialize state with existing child data
   const [name, setName] = useState(child.name);
@@ -45,8 +45,10 @@ const EditChildScreen = ({ route, navigation }) => {
   // --- Navigate to Map while passing current form state ---
   const handleGoToMap = () => {
     navigation.navigate("LocationPicker", {
+      returnScreen: "EditChild",
       existingData: { name, school, grade, pickupLocation },
       initialLocation: mapLocation, // Pass existing pin to map
+      childData: child,
     });
   };
 
@@ -66,7 +68,7 @@ const EditChildScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      // Send Update Request to Backend including Location Data AND Existing Driver Info
+      // Send Update Request to Backend including Location Data
       const response = await api.put(`/children/${child._id}`, {
         name,
         school,
@@ -76,7 +78,7 @@ const EditChildScreen = ({ route, navigation }) => {
           latitude: mapLocation.latitude,
           longitude: mapLocation.longitude,
         },
-        // --- NEW: Keep the existing driver and status so they don't get lost! ---
+        // --- NEW: Keep existing Driver & Status safe! ---
         driver_id: child.driver_id,
         status: child.status,
       });

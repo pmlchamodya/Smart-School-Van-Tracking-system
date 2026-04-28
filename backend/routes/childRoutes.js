@@ -5,8 +5,16 @@ const Payment = require("../models/Payment");
 
 // 1. Route: Add Child
 router.post("/add", async (req, res) => {
-  const { parent_id, name, school, grade, pickupLocation, driver_id } =
-    req.body;
+  // FIXED: Added 'location' to destructuring
+  const {
+    parent_id,
+    name,
+    school,
+    grade,
+    pickupLocation,
+    location,
+    driver_id,
+  } = req.body;
 
   try {
     const newChild = new Child({
@@ -16,6 +24,7 @@ router.post("/add", async (req, res) => {
       school,
       grade,
       pickupLocation,
+      location, // FIXED: Ensure exact GPS coordinates are saved
     });
 
     await newChild.save();
@@ -37,7 +46,7 @@ router.get("/:parentId", async (req, res) => {
   }
 });
 
-// --- Get Children by Driver ID ---
+// 3. Route: Get Children by Driver ID
 // Endpoint: GET /api/children/driver/:driverId
 router.get("/driver/:driverId", async (req, res) => {
   try {
@@ -48,7 +57,7 @@ router.get("/driver/:driverId", async (req, res) => {
   }
 });
 
-// 3. Delete Child (With Pro-rata Final Settlement Logic)
+// 4. Route: Delete Child (With Pro-rata Final Settlement Logic)
 router.delete("/:id", async (req, res) => {
   try {
     const child = await Child.findById(req.params.id);
@@ -85,7 +94,7 @@ router.delete("/:id", async (req, res) => {
       const diffTime = Math.abs(today - calculationStartDate);
       let daysUsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // --- NEW: Minimum 1 day charge ---
+      // Minimum 1 day charge
       if (daysUsed === 0) {
         daysUsed = 1;
       }
@@ -127,7 +136,7 @@ router.delete("/:id", async (req, res) => {
         if (daysUsed > 0 && proRataAmount > 0) {
           await Payment.create({
             childId: child._id,
-            childName: child.name, // Saved permanently
+            childName: child.name,
             parentId: child.parent_id,
             driverId: child.driver_id,
             month: currentMonth,
@@ -142,7 +151,7 @@ router.delete("/:id", async (req, res) => {
       }
     }
 
-    // 3. If no bills pending and no pro-rata owed, delete safely!
+    // 3. If no bills pending and no pro-rata owed, delete safely
     await Child.findByIdAndDelete(req.params.id);
     res.json({ message: "Child removed successfully" });
   } catch (error) {
@@ -151,22 +160,39 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// 4. Update Child Details & Status
+// 5. Route: Update Child Details & Status
 router.put("/:id", async (req, res) => {
   try {
-    const { name, school, grade, pickupLocation, status, driver_id } = req.body;
+    // FIXED: Added 'location' to destructuring
+    const { name, school, grade, pickupLocation, status, driver_id, location } =
+      req.body;
 
     // 1. Check if child exists
     const existingChild = await Child.findById(req.params.id);
     if (!existingChild)
       return res.status(404).json({ message: "Child not found" });
 
-    // 2. Update the child's details and driver assignment
-    let updateData = { name, school, grade, pickupLocation, status, driver_id };
+    // 2. Update the child's basic details
+    let updateData = { name, school, grade, pickupLocation };
 
-    // 3. If driver is being newly assigned, set the driverAssignedAt timestamp
-    if (driver_id && !existingChild.driver_id) {
-      updateData.driverAssignedAt = new Date();
+    // FIXED: Only update location if it is provided
+    if (location) {
+      updateData.location = location;
+    }
+
+    // FIXED: Only update status if it is provided
+    if (status) {
+      updateData.status = status;
+    }
+
+    // FIXED: Securely update driver without accidentally removing it
+    if (driver_id !== undefined) {
+      updateData.driver_id = driver_id;
+
+      // If driver is being newly assigned, set the driverAssignedAt timestamp
+      if (driver_id && !existingChild.driver_id) {
+        updateData.driverAssignedAt = new Date();
+      }
     }
 
     const updatedChild = await Child.findByIdAndUpdate(
@@ -181,7 +207,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// --- NEW ROUTE: Update Child's Attendance ---
+// 6. Route: Update Child's Attendance
 // Endpoint: PUT /api/children/attendance/:id
 router.put("/attendance/:id", async (req, res) => {
   try {

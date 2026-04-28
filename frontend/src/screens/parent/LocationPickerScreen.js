@@ -54,15 +54,18 @@ const LocationPickerScreen = ({ route, navigation }) => {
   }, []);
 
   const handleConfirmLocation = () => {
+    const returnScreen = route.params?.returnScreen || "AddChild";
+    const childData = route.params?.childData;
     // navigate method with 'merge: true' helps to return to the EXISTING screen
     navigation.navigate({
-      name: "AddChild",
+      name: returnScreen,
       params: {
         selectedLocation: {
           latitude: region.latitude,
           longitude: region.longitude,
         },
         returnedData: existingData,
+        child: childData,
       },
       merge: true, // This is very important to avoid stack issues!
     });

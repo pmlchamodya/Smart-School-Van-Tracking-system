@@ -19,17 +19,8 @@ import {
   MaterialIcons,
 } from "@expo/vector-icons";
 import api from "../../services/api";
+import socket from "../../services/socket";
 import { useFocusEffect } from "@react-navigation/native";
-import io from "socket.io-client";
-
-// --- SOCKET CONNECTION ---
-// THIS IP WITH YOUR PC'S LOCAL IP ADDRESS
-const socket = io("http://192.168.1.3:5000", {
-  //   transports: ["websocket"],
-  // });
-  //const socket = io("http://10.16.139.205:5000", {
-  transports: ["websocket"],
-});
 
 const DriverDashboard = ({ navigation }) => {
   // --- State Variables ---
@@ -44,7 +35,7 @@ const DriverDashboard = ({ navigation }) => {
 
   // --- Map Region State ---
   const [region, setRegion] = useState({
-    latitude: 6.9271, // Default: Colombo
+    latitude: 6.9271,
     longitude: 79.8612,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
@@ -85,7 +76,6 @@ const DriverDashboard = ({ navigation }) => {
       if (isJourneyStarted && driverId) {
         console.log("Starting Live Tracking...");
 
-        // Watch for location changes
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
@@ -95,10 +85,8 @@ const DriverDashboard = ({ navigation }) => {
           (location) => {
             const { latitude, longitude } = location.coords;
 
-            // Update local map
             setRegion((prev) => ({ ...prev, latitude, longitude }));
 
-            // Emit location to Backend
             console.log("Sending Location:", latitude, longitude);
             socket.emit("sendLocation", {
               driverId: driverId,
@@ -113,13 +101,11 @@ const DriverDashboard = ({ navigation }) => {
     if (isJourneyStarted) {
       startTracking();
     } else {
-      // Stop tracking if journey ends
       if (locationSubscription) {
         locationSubscription.remove();
       }
     }
 
-    // Cleanup on unmount
     return () => {
       if (locationSubscription) locationSubscription.remove();
     };
@@ -164,7 +150,7 @@ const DriverDashboard = ({ navigation }) => {
     }, []),
   );
 
-  // Listen for Live Attendance Updates ---
+  // --- Listen for Live Attendance Updates ---
   useEffect(() => {
     if (driverId) {
       socket.on(`refreshDriver_${driverId}`, () => {
@@ -182,7 +168,7 @@ const DriverDashboard = ({ navigation }) => {
     };
   }, [driverId]);
 
-  // --- Toggle Student Status ---
+  // --- Toggle Student Status (UPDATED WITH PUSH NOTIFICATION) ---
   const toggleStudentStatus = async (childId, currentStatus) => {
     let newStatus =
       currentStatus === "safe"
@@ -191,11 +177,39 @@ const DriverDashboard = ({ navigation }) => {
           ? "school"
           : "safe";
     try {
+      // 1. Update Database
       await api.put(`/children/${childId}`, { status: newStatus });
+
+      // 2. Update Local State
       setStudents((prev) =>
         prev.map((c) => (c._id === childId ? { ...c, status: newStatus } : c)),
       );
-      // Alert.alert("Success", `Status updated to: ${newStatus}`);
+
+      // 3. --- NEW: Send Real-time Notification to Parent via Socket.io ---
+      const targetChild = students.find((c) => c._id === childId);
+      if (targetChild && targetChild.parent_id) {
+        let title = "Status Update";
+        let message = `Status changed to ${newStatus}.`;
+
+        // Set dynamic messages based on the action
+        if (newStatus === "in-van") {
+          title = "Child Picked Up! 🚐";
+          message = `${targetChild.name} has safely boarded the van.`;
+        } else if (newStatus === "school") {
+          title = "Dropped at School! 🏫";
+          message = `${targetChild.name} has been dropped off at school.`;
+        } else if (newStatus === "safe") {
+          title = "Safely Home! 🏡";
+          message = `${targetChild.name} has been dropped off at home safely.`;
+        }
+
+        // Emit to the backend
+        socket.emit("notify_parent", {
+          parentId: targetChild.parent_id,
+          title: title,
+          message: message,
+        });
+      }
     } catch (error) {
       Alert.alert("Error", "Failed to update status");
     }
@@ -208,8 +222,7 @@ const DriverDashboard = ({ navigation }) => {
         {
           text: "Yes",
           onPress: () => {
-            setIsJourneyStarted(false); // Stop tracking
-            // Send journey ended signal to backend
+            setIsJourneyStarted(false);
             if (driverId) {
               socket.emit("journeyEnded", { driverId: driverId });
             }
@@ -253,15 +266,18 @@ const DriverDashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* --- LIVE MAP SECTION (Click to expand) --- */}
+        {/* --- LIVE MAP SECTION --- */}
         <Text className="text-gray-800 font-bold mb-3 text-lg">
           Live Location
         </Text>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() =>
-            navigation.navigate("DriverMap", { initialRegion: region })
-          }
+          onPress={() => {
+            navigation.navigate("DriverMap", {
+              initialRegion: region,
+              students: students,
+            });
+          }}
           className="h-56 w-full rounded-3xl overflow-hidden mb-6 shadow-md border border-gray-200 bg-gray-200"
         >
           <MapView
@@ -281,7 +297,6 @@ const DriverDashboard = ({ navigation }) => {
               </View>
             </Marker>
           </MapView>
-          {/* Click hint overlay */}
           <View className="absolute bottom-2 right-2 bg-black/50 px-2 py-1 rounded-lg">
             <Text className="text-white text-[10px]">Tap to Expand</Text>
           </View>
@@ -361,8 +376,8 @@ const DriverDashboard = ({ navigation }) => {
               key={child._id}
               className={`p-4 rounded-xl mb-3 flex-row justify-between items-center shadow-sm border-l-4 ${
                 child.isAbsent
-                  ? "bg-red-50 border-red-500" // Absent Styling
-                  : "bg-white border-blue-500" // Normal Styling
+                  ? "bg-red-50 border-red-500"
+                  : "bg-white border-blue-500"
               }`}
             >
               <View className="flex-1">
@@ -370,7 +385,6 @@ const DriverDashboard = ({ navigation }) => {
                   <Text className="text-lg font-bold text-gray-800 mr-2">
                     {child.name}
                   </Text>
-                  {/* --- NEW: Show Absent Badge if isAbsent is true --- */}
                   {child.isAbsent && (
                     <View className="bg-red-100 px-2 py-0.5 rounded-md border border-red-300">
                       <Text className="text-red-700 font-bold text-xs">
@@ -412,7 +426,7 @@ const DriverDashboard = ({ navigation }) => {
                 )}
               </View>
 
-              {/* --- NEW: Hide Action Button if Absent --- */}
+              {/* Action Button */}
               {!child.isAbsent && (
                 <TouchableOpacity
                   onPress={() => toggleStudentStatus(child._id, child.status)}
