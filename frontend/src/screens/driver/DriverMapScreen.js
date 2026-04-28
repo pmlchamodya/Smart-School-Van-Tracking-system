@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -22,13 +22,17 @@ import {
 } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// --- NEW: Import API and Socket to handle the "Get In" action from the Map ---
+import api from "../../services/api";
+import socket from "../../services/socket";
+
 const DriverMapScreen = ({ route, navigation }) => {
   const { initialRegion, students } = route.params;
 
   const [selectedStudent, setSelectedStudent] = useState(null);
-
   const [routeCoords, setRouteCoords] = useState([]);
   const [isRouting, setIsRouting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false); // Loading state for the "Get In" button
 
   const waitingStudents = students
     ? students.filter(
@@ -71,7 +75,7 @@ const DriverMapScreen = ({ route, navigation }) => {
     }
   }, [selectedStudent, initialRegion]);
 
-  // --- NEW: Smart Navigation Launcher with User Choice ---
+  // Smart Navigation Launcher
   const openExternalNavigation = (student) => {
     if (!student || !student.location) return;
 
@@ -79,7 +83,6 @@ const DriverMapScreen = ({ route, navigation }) => {
     const lng = student.location.longitude;
 
     if (Platform.OS === "ios") {
-      // If iOS, show an alert for the driver to choose the app
       Alert.alert(
         "Select Navigation App",
         "Which app do you want to use for live navigation?",
@@ -89,7 +92,6 @@ const DriverMapScreen = ({ route, navigation }) => {
             onPress: () => {
               const googleUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
               const webFallback = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-              // Fallback to web browser if Google Maps app is not installed
               Linking.openURL(googleUrl).catch(() =>
                 Linking.openURL(webFallback),
               );
@@ -110,8 +112,40 @@ const DriverMapScreen = ({ route, navigation }) => {
         ],
       );
     } else {
-      // If Android, directly open Google Maps navigation
       Linking.openURL(`google.navigation:q=${lat},${lng}`);
+    }
+  };
+
+  // --- NEW: Function to mark child as "in-van" directly from the map ---
+  const handlePickedUp = async (student) => {
+    try {
+      setIsUpdating(true);
+
+      // 1. Update status in the Database
+      await api.put(`/children/${student._id}`, { status: "in-van" });
+
+      // 2. Send Real-time Notification to Parent via Socket.io
+      if (student.parent_id) {
+        socket.emit("notify_parent", {
+          parentId: student.parent_id,
+          title: "Child Picked Up! 🚐",
+          message: `${student.name} has safely boarded the van.`,
+        });
+      }
+
+      // 3. Show Success Alert and Go Back to Dashboard to refresh data
+      Alert.alert("Picked Up! ✅", `${student.name} is now in the van.`, [
+        {
+          text: "OK",
+          onPress: () => {
+            setIsUpdating(false);
+            navigation.goBack(); // Return to dashboard
+          },
+        },
+      ]);
+    } catch (error) {
+      setIsUpdating(false);
+      Alert.alert("Error", "Failed to update status. Please try again.");
     }
   };
 
@@ -206,20 +240,44 @@ const DriverMapScreen = ({ route, navigation }) => {
                   {selectedStudent.pickupLocation || selectedStudent.school}
                 </Text>
 
-                <TouchableOpacity
-                  onPress={() => openExternalNavigation(selectedStudent)}
-                  className="bg-green-600 w-full py-3 rounded-xl flex-row justify-center items-center shadow-sm"
-                >
-                  <FontAwesome5 name="directions" size={18} color="white" />
-                  <Text className="text-white font-bold ml-2 text-base">
-                    Start Live Navigation
-                  </Text>
-                </TouchableOpacity>
+                {/* --- NEW: Split action buttons for Navigate and Pick Up --- */}
+                <View className="flex-row justify-between w-full mt-2">
+                  {/* Navigation Button (Left Side) */}
+                  <TouchableOpacity
+                    onPress={() => openExternalNavigation(selectedStudent)}
+                    className="bg-green-600 flex-1 py-3 rounded-xl flex-row justify-center items-center mr-2 shadow-sm"
+                  >
+                    <FontAwesome5 name="directions" size={16} color="white" />
+                    <Text className="text-white font-bold ml-2">Navigate</Text>
+                  </TouchableOpacity>
+
+                  {/* Get In Button (Right Side) */}
+                  <TouchableOpacity
+                    onPress={() => handlePickedUp(selectedStudent)}
+                    disabled={isUpdating}
+                    className="bg-blue-600 flex-1 py-3 rounded-xl flex-row justify-center items-center ml-2 shadow-sm"
+                  >
+                    {isUpdating ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons
+                          name="bus-door"
+                          size={18}
+                          color="white"
+                        />
+                        <Text className="text-white font-bold ml-2">
+                          Get In
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </>
             )}
           </View>
         ) : (
-          <Text style={styles.infoText}>Select a student to see the route</Text>
+          <Text style={styles.infoText}>Select a student to see actions</Text>
         )}
       </View>
     </SafeAreaView>

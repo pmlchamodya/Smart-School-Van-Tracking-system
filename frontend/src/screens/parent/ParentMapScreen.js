@@ -15,7 +15,7 @@ import socket from "../../services/socket";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ParentMapScreen = ({ navigation }) => {
-  // --- Map and Tracking States ---
+  // Map and Tracking States
   const [region, setRegion] = useState({
     latitude: 6.9271, // Default: Colombo
     longitude: 79.8612,
@@ -29,10 +29,10 @@ const ParentMapScreen = ({ navigation }) => {
   const [status, setStatus] = useState("Waiting for driver...");
   const [driverId, setDriverId] = useState(null);
 
-  // Reference to the map to allow smooth animations
+  // Reference to the map to allow smooth camera animations
   const mapRef = useRef(null);
 
-  // --- Step 1: Fetch Driver ID on Component Mount ---
+  // Step 1: Fetch Driver ID on Component Mount
   useEffect(() => {
     const fetchDriverDetails = async () => {
       try {
@@ -61,15 +61,16 @@ const ParentMapScreen = ({ navigation }) => {
     fetchDriverDetails();
   }, []);
 
-  // --- Step 2: Setup Socket Listener once Driver ID is found ---
+  // Step 2: Setup Socket Listener once Driver ID is found
   useEffect(() => {
-    // Wait until we actually have a driverId before setting up the listener
     if (!driverId) return;
 
-    console.log("Setting up live tracking for Driver ID:", driverId);
+    // Convert to strict string to ensure exact matching with backend
+    const safeDriverId = String(driverId).trim();
+    console.log("Setting up live tracking for Driver ID:", safeDriverId);
 
     // Listen for incoming location updates from this specific driver
-    socket.on(`receiveLocation_${driverId}`, (data) => {
+    socket.on(`receiveLocation_${safeDriverId}`, (data) => {
       console.log("Live Location Received:", data.latitude, data.longitude);
 
       const newCoordinate = {
@@ -87,16 +88,16 @@ const ParentMapScreen = ({ navigation }) => {
         mapRef.current.animateToRegion(
           {
             ...newCoordinate,
-            latitudeDelta: 0.005, // Zoomed in value
+            latitudeDelta: 0.005, // Zoom level
             longitudeDelta: 0.005,
           },
-          1000,
-        ); // 1-second smooth glide animation
+          1000, // 1-second smooth glide animation
+        );
       }
     });
 
     // Listen for journey end signal
-    socket.on(`journeyEnded_${driverId}`, () => {
+    socket.on(`journeyEnded_${safeDriverId}`, () => {
       console.log("Driver ended the journey");
       setVanLocation(null); // Hide the van marker from the map
       setStatus("Journey Ended / Offline");
@@ -105,15 +106,15 @@ const ParentMapScreen = ({ navigation }) => {
 
     // Cleanup listeners when the parent leaves the map screen
     return () => {
-      socket.off(`receiveLocation_${driverId}`);
-      socket.off(`journeyEnded_${driverId}`);
+      socket.off(`receiveLocation_${safeDriverId}`);
+      socket.off(`journeyEnded_${safeDriverId}`);
     };
-  }, [driverId]); // This effect re-runs only if the driverId changes
+  }, [driverId]);
 
   return (
     <SafeAreaView style={styles.container}>
       <MapView
-        ref={mapRef} // Attach the map reference
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={region}
