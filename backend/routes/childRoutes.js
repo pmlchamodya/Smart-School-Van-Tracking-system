@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const Child = require("../models/Child");
 const Payment = require("../models/Payment");
+const User = require("../models/User");
+const admin = require("firebase-admin");
 
 // 1. Route: Add Child
 router.post("/add", async (req, res) => {
@@ -192,13 +194,51 @@ router.put("/:id", async (req, res) => {
       { new: true },
     );
 
+    // --- NEW: Send Firebase Push Notification when Status Changes ---
+    if (status && existingChild.status !== status) {
+      try {
+        const parent = await User.findById(existingChild.parent_id);
+
+        if (parent && parent.fcmToken) {
+          let title = "Van Status Update";
+          let message = `Status changed to ${status}.`;
+
+          if (status === "in-van") {
+            title = "Child Picked Up! 🚐";
+            message = `${existingChild.name} has safely boarded the van.`;
+          } else if (status === "school") {
+            title = "Dropped at School! 🏫";
+            message = `${existingChild.name} has been dropped off at school.`;
+          } else if (status === "safe") {
+            title = "Safely Home! 🏡";
+            message = `${existingChild.name} has been dropped off at home safely.`;
+          }
+
+          const fcmMessage = {
+            notification: {
+              title: title,
+              body: message,
+            },
+            token: parent.fcmToken,
+          };
+
+          await admin.messaging().send(fcmMessage);
+          console.log(
+            `FCM Notification sent to parent of ${existingChild.name}`,
+          );
+        }
+      } catch (fcmError) {
+        console.error("FCM Error:", fcmError);
+      }
+    }
+
     res.json({ message: "Child updated successfully", child: updatedChild });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
   }
 });
 
-// --- UPDATED: 6. Route: Update Child's Attendance & Save to History ---
+// 6. Route: Update Child's Attendance & Save to History
 // Endpoint: PUT /api/children/attendance/:id
 router.put("/attendance/:id", async (req, res) => {
   try {
@@ -236,19 +276,40 @@ router.put("/attendance/:id", async (req, res) => {
     if (existingRecordIndex !== -1) {
       // Update existing record for today AND update the time
       child.attendanceHistory[existingRecordIndex].status = attendanceStatus;
-      // We are adding a 'time' field. Mongoose will accept it if strict mode allows,
-      // but to be safe, make sure your Child schema accepts dynamic fields or update the schema.
       child.attendanceHistory[existingRecordIndex].time = timeString;
     } else {
       // Add a new record with the TIME
       child.attendanceHistory.push({
         date: today,
         status: attendanceStatus,
-        time: timeString, // <--- NEW FIELD
+        time: timeString,
       });
     }
 
     await child.save();
+
+    // --- NEW: Send Firebase Push Notification for Attendance (Absent) ---
+    if (isAbsent) {
+      try {
+        const parent = await User.findById(child.parent_id);
+        if (parent && parent.fcmToken) {
+          const fcmMessage = {
+            notification: {
+              title: "Attendance Update",
+              body: `${child.name} has been marked as ABSENT for today.`,
+            },
+            token: parent.fcmToken,
+          };
+          await admin.messaging().send(fcmMessage);
+          console.log(
+            `FCM Notification (Absent) sent to parent of ${child.name}`,
+          );
+        }
+      } catch (fcmError) {
+        console.error("FCM Error (Absent):", fcmError);
+      }
+    }
+
     res.json({ message: "Attendance updated successfully", child });
   } catch (error) {
     console.error("Error updating attendance:", error);
@@ -256,7 +317,7 @@ router.put("/attendance/:id", async (req, res) => {
   }
 });
 
-// --- NEW: 7. Route: Get Monthly Attendance Report ---
+// 7. Route: Get Monthly Attendance Report
 // Endpoint: GET /api/children/attendance-report/:id/:month
 router.get("/attendance-report/:id/:month", async (req, res) => {
   try {

@@ -4,11 +4,20 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const http = require("http");
 const { Server } = require("socket.io");
+const admin = require("firebase-admin");
 
 // Models
 const cron = require("node-cron");
 const Payment = require("./models/Payment");
 const Child = require("./models/Child");
+const User = require("./models/User");
+
+// Firebase Admin SDK Initialization
+const serviceAccount = require("./config/firebase-key.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // Route Imports
 const userRoutes = require("./routes/userRoutes");
@@ -55,7 +64,27 @@ io.on("connection", (socket) => {
   });
 
   // --- NEW: Listen for notifications from Driver and send to specific Parent ---
-  socket.on("notify_parent", (data) => {
+  socket.on("notify_parent", async (data) => {
+    try {
+      console.log("1. Parent ID received from Frontend:", data.parentId);
+      if (data.parentId) {
+        const parent = await User.findById(data.parentId);
+        if (parent && parent.fcmToken) {
+          const fcmMessage = {
+            notification: {
+              title: data.title,
+              body: data.message,
+            },
+            token: parent.fcmToken,
+          };
+          await admin.messaging().send(fcmMessage);
+          console.log(`FCM Socket Alert sent to parent! Title: ${data.title}`);
+        }
+      }
+    } catch (error) {
+      console.error("FCM Socket Error:", error);
+    }
+
     console.log("Notification sending to parent:", data.parentId);
     // Emit only to the specific parent's room
     io.to(data.parentId).emit("receive_notification", {

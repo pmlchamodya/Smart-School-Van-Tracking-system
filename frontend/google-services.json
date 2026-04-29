@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "854049654291",
+    "project_id": "smartvantracking",
+    "storage_bucket": "smartvantracking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:854049654291:android:cbf02e1ce48c8574bce1e6",
+        "android_client_info": {
+          "package_name": "com.lakindu.smartvan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeYWE9_X_bSPqurveME22DFzv7_87Kktk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

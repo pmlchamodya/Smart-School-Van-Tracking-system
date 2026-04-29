@@ -8,6 +8,7 @@ const userSchema = mongoose.Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     phoneNumber: { type: String, required: true, unique: true },
+    fcmToken: { type: String, default: null },
     role: {
       type: String,
       enum: ["admin", "driver", "parent"],

@@ -10,6 +10,7 @@ import {
 import api from "../../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { registerForPushNotificationsAsync } from "../../services/api";
 
 const LoginScreen = ({ navigation }) => {
   const [identifier, setIdentifier] = useState("");
@@ -27,10 +28,12 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
+      const fcmToken = await registerForPushNotificationsAsync();
       // 2. Send Request to Backend
       const response = await api.post("/users/login", {
         identifier: identifier,
         password: password,
+        fcmToken: fcmToken, // Send the FCM token to backend for storage
       });
 
       // 3. Login Successful

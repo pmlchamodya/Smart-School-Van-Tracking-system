@@ -1,11 +1,11 @@
-# Node modules (මේවා ගොඩක් ලොකුයි, Git එකට යවන්න ඕන නෑ)
+# Node modules 
 node_modules/
 
-# Environment variables (පාස්වර්ඩ් තියෙන ෆයිල්)
+# Environment variables 
 .env
 .env.local
 
-# Expo / React Native (Frontend එකට අදාළ අනවශ්‍ය ෆයිල්)
+# Expo / React Native 
 .expo/
 dist/
 web-build/
@@ -18,3 +18,5 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+config/firebase-key.json

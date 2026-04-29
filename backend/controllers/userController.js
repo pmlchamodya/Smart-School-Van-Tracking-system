@@ -49,7 +49,7 @@ const registerUser = async (req, res) => {
 };
 
 const authUser = async (req, res) => {
-  const { identifier, password } = req.body;
+  const { identifier, password, fcmToken } = req.body;
 
   try {
     const user = await User.findOne({
@@ -57,6 +57,11 @@ const authUser = async (req, res) => {
     });
 
     if (user && (await user.matchPassword(password))) {
+      // Update FCM Token if provided
+      if (fcmToken) {
+        user.fcmToken = fcmToken;
+        await user.save();
+      }
       res.json({
         _id: user._id,
         name: user.name,
