@@ -4,9 +4,8 @@ const ChildSchema = new mongoose.Schema({
   parent_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true, // Link to Parent
+    required: true,
   },
-  // --- Link to Driver ---
   driver_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -51,6 +50,13 @@ const ChildSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  attendanceHistory: [
+    {
+      date: { type: String, required: true },
+      status: { type: String, enum: ["Present", "Absent"], required: true },
+      time: { type: String },
+    },
+  ],
   createdAt: {
     type: Date,
     default: Date.now,

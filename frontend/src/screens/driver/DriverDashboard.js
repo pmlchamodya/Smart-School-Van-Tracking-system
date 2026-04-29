@@ -7,6 +7,9 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Modal,
+  TextInput,
+  Keyboard, // <-- Make sure Keyboard is imported
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
@@ -22,9 +25,8 @@ import api from "../../services/api";
 import socket from "../../services/socket";
 import { useFocusEffect } from "@react-navigation/native";
 
-// --- NEW: Helper function to calculate GPS distance in meters (Haversine Formula) ---
 const getDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3; // Earth's radius in meters
+  const R = 6371e3;
   const p1 = (lat1 * Math.PI) / 180;
   const p2 = (lat2 * Math.PI) / 180;
   const dp = ((lat2 - lat1) * Math.PI) / 180;
@@ -35,11 +37,10 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
     Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return Math.floor(R * c); // Returns distance in meters
+  return Math.floor(R * c);
 };
 
 const DriverDashboard = ({ navigation }) => {
-  // State Variables
   const [driverName, setDriverName] = useState("");
   const [driverId, setDriverId] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
@@ -48,11 +49,11 @@ const DriverDashboard = ({ navigation }) => {
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  // --- NEW: State to track which parents already received the 3-min warning ---
   const [notifiedStudents, setNotifiedStudents] = useState({});
 
-  // Map Region State
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [customAlertMsg, setCustomAlertMsg] = useState("");
+
   const [region, setRegion] = useState({
     latitude: 6.9271,
     longitude: 79.8612,
@@ -60,7 +61,6 @@ const DriverDashboard = ({ navigation }) => {
     longitudeDelta: 0.01,
   });
 
-  // Get Current Location (Initial Load)
   const getCurrentLocation = async () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -87,14 +87,11 @@ const DriverDashboard = ({ navigation }) => {
     }
   };
 
-  // 1. Live Tracking Logic (Socket.io)
   useEffect(() => {
     let locationSubscription;
 
     const startTracking = async () => {
       if (isJourneyStarted && driverId) {
-        console.log("Starting Live Tracking...");
-
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
@@ -103,9 +100,7 @@ const DriverDashboard = ({ navigation }) => {
           },
           (location) => {
             const { latitude, longitude } = location.coords;
-
             setRegion((prev) => ({ ...prev, latitude, longitude }));
-
             socket.emit("sendLocation", {
               driverId: String(driverId).trim(),
               latitude,
@@ -127,12 +122,9 @@ const DriverDashboard = ({ navigation }) => {
     };
   }, [isJourneyStarted, driverId]);
 
-  // --- NEW: 2. Smart Proximity Notifications (3-Min Warning) ---
   useEffect(() => {
-    // Only check distances if journey is active and we have students
     if (isJourneyStarted && students.length > 0) {
       students.forEach((student) => {
-        // Check only students waiting to be picked up
         if (
           !student.isAbsent &&
           student.status === "safe" &&
@@ -145,26 +137,19 @@ const DriverDashboard = ({ navigation }) => {
             student.location.longitude,
           );
 
-          // If van is within 1000 meters (~1km / ~3 mins) and not yet notified
           if (distanceInMeters <= 1000 && !notifiedStudents[student._id]) {
-            console.log(`Sending 3-min warning to ${student.name}'s parent`);
-
-            // Emit push notification to this specific parent
             socket.emit("notify_parent", {
               parentId: student.parent_id,
               title: "Van is arriving soon! ⏰",
               message: `The school van is approx 3 minutes away to pick up ${student.name}. Please get ready!`,
             });
-
-            // Mark this student as notified so we don't spam the parent every 3 seconds
             setNotifiedStudents((prev) => ({ ...prev, [student._id]: true }));
           }
         }
       });
     }
-  }, [region, isJourneyStarted, students]); // Runs every time van moves (region updates)
+  }, [region, isJourneyStarted, students]);
 
-  // Load Driver Data & Students
   const loadDriverData = async () => {
     try {
       setLoading(true);
@@ -203,13 +188,9 @@ const DriverDashboard = ({ navigation }) => {
     }, []),
   );
 
-  // Listen for Live Attendance Updates
   useEffect(() => {
     if (driverId) {
       socket.on(`refreshDriver_${driverId}`, () => {
-        console.log(
-          "Live Update: Parent changed attendance! Fetching new data...",
-        );
         loadDriverData();
       });
     }
@@ -218,7 +199,6 @@ const DriverDashboard = ({ navigation }) => {
     };
   }, [driverId]);
 
-  // 3. Toggle Student Status (Picked Up Notification)
   const toggleStudentStatus = async (childId, currentStatus) => {
     let newStatus =
       currentStatus === "safe"
@@ -228,12 +208,10 @@ const DriverDashboard = ({ navigation }) => {
           : "safe";
     try {
       await api.put(`/children/${childId}`, { status: newStatus });
-
       setStudents((prev) =>
         prev.map((c) => (c._id === childId ? { ...c, status: newStatus } : c)),
       );
 
-      // Send Real-time Notification to Parent
       const targetChild = students.find((c) => c._id === childId);
       if (targetChild && targetChild.parent_id) {
         let title = "Status Update";
@@ -261,7 +239,6 @@ const DriverDashboard = ({ navigation }) => {
     }
   };
 
-  // 4. Toggle Journey (Journey Started Notification)
   const toggleJourney = () => {
     if (isJourneyStarted) {
       Alert.alert("End Journey", "Are you sure you want to end the journey?", [
@@ -269,7 +246,7 @@ const DriverDashboard = ({ navigation }) => {
           text: "Yes",
           onPress: () => {
             setIsJourneyStarted(false);
-            setNotifiedStudents({}); // Reset notifications for the next trip
+            setNotifiedStudents({});
             if (driverId) {
               socket.emit("journeyEnded", { driverId: driverId });
             }
@@ -279,9 +256,8 @@ const DriverDashboard = ({ navigation }) => {
       ]);
     } else {
       setIsJourneyStarted(true);
-      setNotifiedStudents({}); // Fresh start for notifications
+      setNotifiedStudents({});
 
-      // --- NEW: Send "Journey Started" notification to ALL waiting parents ---
       students.forEach((student) => {
         if (!student.isAbsent && student.status === "safe") {
           socket.emit("notify_parent", {
@@ -292,7 +268,6 @@ const DriverDashboard = ({ navigation }) => {
         }
       });
 
-      // Force an immediate GPS ping
       if (driverId && region.latitude) {
         socket.emit("sendLocation", {
           driverId: String(driverId).trim(),
@@ -303,6 +278,33 @@ const DriverDashboard = ({ navigation }) => {
 
       Alert.alert("Journey Started", "All parents have been notified.");
     }
+  };
+
+  const sendBroadcastAlert = (message) => {
+    Keyboard.dismiss();
+    if (!message) {
+      Alert.alert("Error", "Please enter or select a message to send.");
+      return;
+    }
+
+    const uniqueParentIds = [...new Set(students.map((s) => s.parent_id))];
+
+    if (uniqueParentIds.length === 0) {
+      Alert.alert("No Parents", "You don't have any students assigned yet.");
+      return;
+    }
+
+    uniqueParentIds.forEach((parentId) => {
+      socket.emit("notify_parent", {
+        parentId: parentId,
+        title: "🚨 URGENT: Driver Update",
+        message: message,
+      });
+    });
+
+    Alert.alert("Broadcast Sent! 📢", "Message has been sent to all parents.");
+    setAlertModalVisible(false);
+    setCustomAlertMsg("");
   };
 
   return (
@@ -401,7 +403,7 @@ const DriverDashboard = ({ navigation }) => {
         {/* Financial / Payments Button */}
         <TouchableOpacity
           onPress={() => navigation.navigate("DriverPayments")}
-          className="bg-green-600 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-6"
+          className="bg-green-600 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-4"
         >
           <View className="flex-row items-center">
             <MaterialIcons
@@ -419,6 +421,25 @@ const DriverDashboard = ({ navigation }) => {
             </View>
           </View>
           <Ionicons name="chevron-forward" size={24} color="white" />
+        </TouchableOpacity>
+
+        {/* Broadcast Emergency Alert Button */}
+        <TouchableOpacity
+          onPress={() => setAlertModalVisible(true)}
+          className="bg-red-50 border border-red-200 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-6"
+        >
+          <View className="flex-row items-center">
+            <Ionicons name="warning" size={28} color="#EF4444" />
+            <View className="ml-3">
+              <Text className="text-red-600 font-bold text-lg">
+                Broadcast Alert
+              </Text>
+              <Text className="text-red-400 text-xs">
+                Send urgent message to all parents
+              </Text>
+            </View>
+          </View>
+          <MaterialCommunityIcons name="broadcast" size={24} color="#EF4444" />
         </TouchableOpacity>
 
         {/* Journey Control Button */}
@@ -462,10 +483,8 @@ const DriverDashboard = ({ navigation }) => {
                     </View>
                   )}
                 </View>
-
                 <Text className="text-gray-500 text-xs">{child.school}</Text>
 
-                {/* Status Label */}
                 {!child.isAbsent ? (
                   <View
                     className={`px-2 py-1 rounded-md mt-2 self-start ${
@@ -495,7 +514,6 @@ const DriverDashboard = ({ navigation }) => {
                 )}
               </View>
 
-              {/* Action Button */}
               {!child.isAbsent && (
                 <TouchableOpacity
                   onPress={() => toggleStudentStatus(child._id, child.status)}
@@ -513,6 +531,127 @@ const DriverDashboard = ({ navigation }) => {
         )}
         <View className="mb-10"></View>
       </ScrollView>
+
+      {/* --- FIXED: Broadcast Alert Modal (Keyboard Dismissing properly) --- */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={alertModalVisible}
+        onRequestClose={() => setAlertModalVisible(false)}
+      >
+        {/* Background Overlay - Tapping this dismisses keyboard */}
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            paddingHorizontal: 20,
+          }}
+          activeOpacity={1}
+          onPress={() => Keyboard.dismiss()}
+        >
+          {/* White Card - Tapping ANYWHERE inside the white card (except buttons) dismisses keyboard */}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => Keyboard.dismiss()}
+            style={{
+              backgroundColor: "white",
+              borderRadius: 24,
+              padding: 24,
+              shadowColor: "#000",
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center">
+                <Ionicons name="warning" size={28} color="#EF4444" />
+                <Text className="text-xl font-bold text-gray-800 ml-2">
+                  Emergency Alert
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setAlertModalVisible(false);
+                }}
+              >
+                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-gray-500 text-sm mb-4">
+              Select a quick message below or type your own to notify all
+              parents instantly.
+            </Text>
+
+            {/* Quick Templates */}
+            <TouchableOpacity
+              onPress={() =>
+                sendBroadcastAlert(
+                  "🚐 Heavy Traffic! I will be delayed by 15-20 minutes.",
+                )
+              }
+              className="bg-orange-50 border border-orange-200 p-3 rounded-xl mb-3"
+            >
+              <Text className="text-orange-800 font-semibold text-sm">
+                🚐 Heavy Traffic - Running Late
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() =>
+                sendBroadcastAlert(
+                  "🌧️ Bad Weather! Driving slowly, expect slight delays.",
+                )
+              }
+              className="bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3"
+            >
+              <Text className="text-blue-800 font-semibold text-sm">
+                🌧️ Bad Weather - Expect Delays
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() =>
+                sendBroadcastAlert(
+                  "⚠️ Van Breakdown! Please hold on, arranging alternative transport.",
+                )
+              }
+              className="bg-red-50 border border-red-200 p-3 rounded-xl mb-4"
+            >
+              <Text className="text-red-800 font-semibold text-sm">
+                ⚠️ Van Breakdown - Urgent!
+              </Text>
+            </TouchableOpacity>
+
+            {/* Custom Message Input */}
+            <Text className="text-gray-600 font-bold mb-2 text-xs uppercase">
+              Or type custom message:
+            </Text>
+            <TextInput
+              className="bg-gray-100 p-4 rounded-xl text-gray-800 min-h-[80px]"
+              placeholder="E.g. Leaving school in 5 mins..."
+              multiline
+              textAlignVertical="top"
+              value={customAlertMsg}
+              onChangeText={setCustomAlertMsg}
+            />
+
+            {/* Send Button */}
+            <TouchableOpacity
+              onPress={() => sendBroadcastAlert(customAlertMsg)}
+              className="bg-red-500 p-4 rounded-xl mt-4 items-center flex-row justify-center"
+            >
+              <Ionicons name="send" size={20} color="white" />
+              <Text className="text-white font-bold text-lg ml-2">
+                Send to All Parents
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };

@@ -284,6 +284,18 @@ const ParentDashboard = ({ navigation }) => {
                 <View className="flex-row items-center mt-1">
                   <TouchableOpacity
                     onPress={() =>
+                      navigation.navigate("AttendanceReport", {
+                        childId: child._id,
+                        childName: child.name,
+                      })
+                    }
+                    className="bg-blue-50 p-2 rounded-full mr-3 border border-blue-100"
+                  >
+                    <Ionicons name="calendar" size={20} color="#2563EB" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() =>
                       navigation.navigate("EditChild", { child: child })
                     }
                     className="bg-gray-100 p-2 rounded-full mr-3"

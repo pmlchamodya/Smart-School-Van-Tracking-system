@@ -28,6 +28,7 @@ import LocationPickerScreen from "./src/screens/parent/LocationPickerScreen";
 import ManageDriversScreen from "./src/screens/admin/ManageDriversScreen";
 import ManageParentsScreen from "./src/screens/admin/ManageParentsScreen";
 import ManageStudentsScreen from "./src/screens/admin/ManageStudentsScreen";
+import AttendanceReportScreen from "./src/screens/parent/AttendanceReportScreen";
 
 const Stack = createStackNavigator();
 
@@ -189,6 +190,12 @@ export default function App() {
             name="ChangePassword"
             component={ChangePasswordScreen}
             options={{ title: "Change Password", headerShown: true }}
+          />
+          {/* Define the Attendance Report Screen */}
+          <Stack.Screen
+            name="AttendanceReport"
+            component={AttendanceReportScreen}
+            options={{ title: "Attendance Report", headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>

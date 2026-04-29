@@ -5,7 +5,6 @@ const Payment = require("../models/Payment");
 
 // 1. Route: Add Child
 router.post("/add", async (req, res) => {
-  // FIXED: Added 'location' to destructuring
   const {
     parent_id,
     name,
@@ -24,7 +23,7 @@ router.post("/add", async (req, res) => {
       school,
       grade,
       pickupLocation,
-      location, // FIXED: Ensure exact GPS coordinates are saved
+      location,
     });
 
     await newChild.save();
@@ -163,33 +162,25 @@ router.delete("/:id", async (req, res) => {
 // 5. Route: Update Child Details & Status
 router.put("/:id", async (req, res) => {
   try {
-    // FIXED: Added 'location' to destructuring
     const { name, school, grade, pickupLocation, status, driver_id, location } =
       req.body;
 
-    // 1. Check if child exists
     const existingChild = await Child.findById(req.params.id);
     if (!existingChild)
       return res.status(404).json({ message: "Child not found" });
 
-    // 2. Update the child's basic details
     let updateData = { name, school, grade, pickupLocation };
 
-    // FIXED: Only update location if it is provided
     if (location) {
       updateData.location = location;
     }
 
-    // FIXED: Only update status if it is provided
     if (status) {
       updateData.status = status;
     }
 
-    // FIXED: Securely update driver without accidentally removing it
     if (driver_id !== undefined) {
       updateData.driver_id = driver_id;
-
-      // If driver is being newly assigned, set the driverAssignedAt timestamp
       if (driver_id && !existingChild.driver_id) {
         updateData.driverAssignedAt = new Date();
       }
@@ -207,32 +198,97 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// 6. Route: Update Child's Attendance
+// --- UPDATED: 6. Route: Update Child's Attendance & Save to History ---
 // Endpoint: PUT /api/children/attendance/:id
 router.put("/attendance/:id", async (req, res) => {
   try {
     const { isAbsent } = req.body;
+    const childId = req.params.id;
 
-    // Find the child and update the 'isAbsent' status
-    // Also reset 'status' to 'safe' when attendance changes
-    const updatedChild = await Child.findByIdAndUpdate(
-      req.params.id,
-      {
-        isAbsent: isAbsent,
-        status: "safe",
-      },
-      { new: true },
-    );
+    // Get today's date and EXACT TIME
+    const now = new Date();
+    const today = now.toISOString().split("T")[0]; // "YYYY-MM-DD"
 
-    if (!updatedChild) {
-      return res.status(404).json({ message: "Child not found" });
+    // Get formatted time (e.g., "07:30 AM")
+    const timeString = now.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const attendanceStatus = isAbsent ? "Absent" : "Present";
+
+    const child = await Child.findById(childId);
+    if (!child) return res.status(404).json({ message: "Child not found" });
+
+    // Update current status
+    child.isAbsent = isAbsent;
+    child.status = "safe";
+
+    if (!child.attendanceHistory) {
+      child.attendanceHistory = [];
     }
 
+    const existingRecordIndex = child.attendanceHistory.findIndex(
+      (record) => record.date === today,
+    );
+
+    if (existingRecordIndex !== -1) {
+      // Update existing record for today AND update the time
+      child.attendanceHistory[existingRecordIndex].status = attendanceStatus;
+      // We are adding a 'time' field. Mongoose will accept it if strict mode allows,
+      // but to be safe, make sure your Child schema accepts dynamic fields or update the schema.
+      child.attendanceHistory[existingRecordIndex].time = timeString;
+    } else {
+      // Add a new record with the TIME
+      child.attendanceHistory.push({
+        date: today,
+        status: attendanceStatus,
+        time: timeString, // <--- NEW FIELD
+      });
+    }
+
+    await child.save();
+    res.json({ message: "Attendance updated successfully", child });
+  } catch (error) {
+    console.error("Error updating attendance:", error);
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
+// --- NEW: 7. Route: Get Monthly Attendance Report ---
+// Endpoint: GET /api/children/attendance-report/:id/:month
+router.get("/attendance-report/:id/:month", async (req, res) => {
+  try {
+    const childId = req.params.id;
+    const month = req.params.month; // Expected Format: "YYYY-MM" (e.g. "2026-04")
+
+    const child = await Child.findById(childId);
+    if (!child) return res.status(404).json({ message: "Child not found" });
+
+    const history = child.attendanceHistory || [];
+
+    // Filter history to only include the requested month
+    const monthlyRecords = history.filter((record) =>
+      record.date.startsWith(month),
+    );
+
+    // Calculate totals
+    const totalPresent = monthlyRecords.filter(
+      (record) => record.status === "Present",
+    ).length;
+    const totalAbsent = monthlyRecords.filter(
+      (record) => record.status === "Absent",
+    ).length;
+
     res.json({
-      message: "Attendance updated successfully",
-      child: updatedChild,
+      month: month,
+      totalPresent,
+      totalAbsent,
+      records: monthlyRecords.reverse(), // Reverse to show latest dates first
     });
   } catch (error) {
+    console.error("Error fetching attendance report:", error);
     res.status(500).json({ message: "Server Error", error });
   }
 });
