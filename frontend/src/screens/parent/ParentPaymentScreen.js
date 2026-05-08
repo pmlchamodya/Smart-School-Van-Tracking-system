@@ -38,14 +38,12 @@ const ParentPaymentScreen = ({ navigation }) => {
     }
   };
 
-  // --- Reload data when screen is focused ---
   useFocusEffect(
     useCallback(() => {
       fetchPayments();
     }, []),
   );
 
-  // --- Navigate to Secure Payment Gateway ---
   const handlePayNow = (paymentId, amount, month, driverId) => {
     navigation.navigate("PaymentGateway", {
       paymentId: paymentId,
@@ -54,6 +52,38 @@ const ParentPaymentScreen = ({ navigation }) => {
       driverId: driverId,
     });
   };
+
+  // --- View Receipt details in an Alert ---
+  const handleViewReceipt = (payment) => {
+    Alert.alert(
+      "Payment Receipt",
+      `Student: ${payment.childId?.name}\nMonth: ${formatMonthString(payment.month)}\nAmount: Rs.${payment.amount}\nStatus: PAID ✅\nMethod: ${payment.paymentMethod}\n\nNote: A detailed e-receipt has been sent to your email.`,
+      [{ text: "Close", style: "cancel" }],
+    );
+  };
+
+  // --- Helper: Format "2026-04" to "April 2026" ---
+  const formatMonthString = (monthStr) => {
+    if (!monthStr) return "Unknown Month";
+    const [year, month] = monthStr.split("-");
+    const date = new Date(year, parseInt(month) - 1);
+    return date.toLocaleString("default", { month: "long", year: "numeric" });
+  };
+
+  // --- Logic: Group Payments by Month ---
+  const groupedPayments = payments.reduce((acc, payment) => {
+    const month = payment.month; // e.g., "2026-04"
+    if (!acc[month]) {
+      acc[month] = [];
+    }
+    acc[month].push(payment);
+    return acc;
+  }, {});
+
+  // Sort months so the newest month comes first (Descending order)
+  const sortedMonths = Object.keys(groupedPayments).sort((a, b) =>
+    b.localeCompare(a),
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -67,7 +97,7 @@ const ParentPaymentScreen = ({ navigation }) => {
         </Text>
       </View>
 
-      <ScrollView className="p-5">
+      <ScrollView className="p-5" showsVerticalScrollIndicator={false}>
         <Text className="text-lg font-bold text-gray-800 mb-4">
           Payment History
         </Text>
@@ -86,80 +116,101 @@ const ParentPaymentScreen = ({ navigation }) => {
             </Text>
           </View>
         ) : (
-          payments.map((payment) => (
-            <View
-              key={payment._id}
-              className={`p-5 rounded-2xl mb-4 shadow-sm border-t-4 ${
-                payment.status === "Paid"
-                  ? "bg-white border-green-500"
-                  : "bg-white border-red-500"
-              }`}
-            >
-              <View className="flex-row justify-between items-start mb-2">
-                <View>
-                  <Text className="text-gray-500 font-bold tracking-widest text-xs uppercase">
-                    Month: {payment.month}
-                  </Text>
-                  <Text className="text-xl font-bold text-gray-800 mt-1">
-                    {payment.childId?.name}
-                  </Text>
-                </View>
-                <Text className="text-2xl font-bold text-blue-600">
-                  Rs.{payment.amount}
+          // --- Render Grouped Payments ---
+          sortedMonths.map((monthKey) => (
+            <View key={monthKey} className="mb-6">
+              {/* Month Section Header */}
+              <View className="flex-row items-center mb-3 ml-1 border-b border-gray-200 pb-2">
+                <Ionicons name="calendar-outline" size={20} color="#4B5563" />
+                <Text className="text-lg font-bold text-gray-700 ml-2">
+                  {formatMonthString(monthKey)}
                 </Text>
               </View>
 
-              <View className="h-[1px] bg-gray-100 my-3"></View>
-
-              <View className="flex-row justify-between items-center">
-                {/* Status Indicator */}
-                <View className="flex-row items-center">
-                  <FontAwesome5
-                    name={payment.status === "Paid" ? "check-circle" : "clock"}
-                    size={16}
-                    color={payment.status === "Paid" ? "#10B981" : "#EF4444"}
-                  />
-                  <Text
-                    className={`font-bold ml-2 ${
-                      payment.status === "Paid"
-                        ? "text-green-600"
-                        : "text-red-500"
-                    }`}
-                  >
-                    {payment.status === "Paid"
-                      ? `Paid via ${payment.paymentMethod}`
-                      : "Payment Pending"}
-                  </Text>
-                </View>
-
-                {/* Action Button: E-Receipt or Pay Now */}
-                {payment.status === "Paid" ? (
-                  <TouchableOpacity className="bg-gray-100 px-3 py-2 rounded-lg flex-row items-center">
-                    <Ionicons
-                      name="download-outline"
-                      size={16}
-                      color="#4B5563"
-                    />
-                    <Text className="text-gray-600 text-xs font-bold ml-1">
-                      Receipt
+              {/* Payment Cards for this Month */}
+              {groupedPayments[monthKey].map((payment) => (
+                <View
+                  key={payment._id}
+                  className={`p-5 rounded-2xl mb-4 shadow-sm border-t-4 ${
+                    payment.status === "Paid"
+                      ? "bg-white border-green-500"
+                      : "bg-white border-red-500"
+                  }`}
+                >
+                  <View className="flex-row justify-between items-start mb-2">
+                    <View>
+                      <Text className="text-gray-500 font-bold tracking-widest text-xs uppercase">
+                        Student
+                      </Text>
+                      <Text className="text-xl font-bold text-gray-800 mt-1">
+                        {payment.childId?.name}
+                      </Text>
+                    </View>
+                    <Text className="text-2xl font-bold text-blue-600">
+                      Rs.{payment.amount}
                     </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() =>
-                      handlePayNow(
-                        payment._id,
-                        payment.amount,
-                        payment.month,
-                        payment.driverId,
-                      )
-                    }
-                    className="bg-blue-600 px-5 py-2 rounded-xl shadow-md"
-                  >
-                    <Text className="text-white font-bold">Pay Now</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                  </View>
+
+                  <View className="h-[1px] bg-gray-100 my-3"></View>
+
+                  <View className="flex-row justify-between items-center">
+                    {/* Status Indicator */}
+                    <View className="flex-row items-center">
+                      <FontAwesome5
+                        name={
+                          payment.status === "Paid" ? "check-circle" : "clock"
+                        }
+                        size={16}
+                        color={
+                          payment.status === "Paid" ? "#10B981" : "#EF4444"
+                        }
+                      />
+                      <Text
+                        className={`font-bold ml-2 ${
+                          payment.status === "Paid"
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {payment.status === "Paid"
+                          ? `Paid via ${payment.paymentMethod}`
+                          : "Payment Pending"}
+                      </Text>
+                    </View>
+
+                    {/* Action Button: E-Receipt or Pay Now */}
+                    {payment.status === "Paid" ? (
+                      <TouchableOpacity
+                        onPress={() => handleViewReceipt(payment)} // මේ ලයින් එක එකතු කරන්න
+                        className="bg-gray-100 px-3 py-2 rounded-lg flex-row items-center"
+                      >
+                        <Ionicons
+                          name="download-outline"
+                          size={16}
+                          color="#4B5563"
+                        />
+                        <Text className="text-gray-600 text-xs font-bold ml-1">
+                          Receipt
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() =>
+                          handlePayNow(
+                            payment._id,
+                            payment.amount,
+                            payment.month,
+                            payment.driverId,
+                          )
+                        }
+                        className="bg-blue-600 px-5 py-2 rounded-xl shadow-md"
+                      >
+                        <Text className="text-white font-bold">Pay Now</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
             </View>
           ))
         )}

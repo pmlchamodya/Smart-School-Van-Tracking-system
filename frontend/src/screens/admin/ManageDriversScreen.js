@@ -18,6 +18,7 @@ import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import api from "../../services/api";
+import PasswordInput from "../../components/inputs/PasswordInput";
 
 const ManageDriversScreen = ({ navigation }) => {
   const [drivers, setDrivers] = useState([]);
@@ -367,11 +368,9 @@ const ManageDriversScreen = ({ navigation }) => {
               <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
                 Temporary Password *
               </Text>
-              <TextInput
+              {/* --- PASSWORD COMPONENT --- */}
+              <PasswordInput
                 placeholder="Enter password"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry
-                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
                 value={newDriver.password}
                 onChangeText={(text) =>
                   setNewDriver({ ...newDriver, password: text })

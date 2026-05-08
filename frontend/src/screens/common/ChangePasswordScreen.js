@@ -1,17 +1,10 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { View, Text, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../services/api";
 import SaveButton from "../../components/button/SaveButton";
-import { MaterialIcons } from "@expo/vector-icons";
+import PasswordInput from "../../components/inputs/PasswordInput";
 
 const ChangePasswordScreen = ({ navigation }) => {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -73,44 +66,29 @@ const ChangePasswordScreen = ({ navigation }) => {
 
         {/* Current Password */}
         <Text className="text-gray-600 font-bold mb-2">Current Password</Text>
-        <View className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 flex-row items-center">
-          <MaterialIcons name="lock-outline" size={20} color="gray" />
-          <TextInput
-            className="flex-1 ml-2 text-gray-800"
-            placeholder="Enter current password"
-            secureTextEntry
-            value={currentPassword}
-            onChangeText={setCurrentPassword}
-          />
-        </View>
+        <PasswordInput
+          placeholder="Enter current password"
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+        />
 
         {/* New Password */}
         <Text className="text-gray-600 font-bold mb-2">New Password</Text>
-        <View className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 flex-row items-center">
-          <MaterialIcons name="lock" size={20} color="#2563EB" />
-          <TextInput
-            className="flex-1 ml-2 text-gray-800"
-            placeholder="Enter new password"
-            secureTextEntry
-            value={newPassword}
-            onChangeText={setNewPassword}
-          />
-        </View>
+        <PasswordInput
+          placeholder="Enter new password"
+          value={newPassword}
+          onChangeText={setNewPassword}
+        />
 
         {/* Confirm New Password */}
         <Text className="text-gray-600 font-bold mb-2">
           Confirm New Password
         </Text>
-        <View className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-8 flex-row items-center">
-          <MaterialIcons name="lock" size={20} color="#2563EB" />
-          <TextInput
-            className="flex-1 ml-2 text-gray-800"
-            placeholder="Re-enter new password"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-          />
-        </View>
+        <PasswordInput
+          placeholder="Re-enter new password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+        />
 
         {/* Submit Button */}
         <SaveButton

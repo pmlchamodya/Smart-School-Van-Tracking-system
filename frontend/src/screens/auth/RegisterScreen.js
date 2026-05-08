@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from "react-native";
 import api from "../../services/api";
+import PasswordInput from "../../components/inputs/PasswordInput";
 
 const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState("");
@@ -127,12 +128,11 @@ const RegisterScreen = ({ navigation }) => {
         keyboardType="phone-pad"
       />
 
-      <TextInput
-        style={styles.input}
+      {/* --- PASSWORD COMPONENT --- */}
+      <PasswordInput
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
       />
 
       {/* Register Button */}

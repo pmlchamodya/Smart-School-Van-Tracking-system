@@ -11,6 +11,7 @@ import api from "../../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { registerForPushNotificationsAsync } from "../../services/api";
+import PasswordInput from "../../components/inputs/PasswordInput";
 
 const LoginScreen = ({ navigation }) => {
   const [identifier, setIdentifier] = useState("");
@@ -127,12 +128,11 @@ const LoginScreen = ({ navigation }) => {
           <Text className="text-gray-600 font-semibold mb-2 ml-1">
             Password
           </Text>
-          <TextInput
-            className="w-full bg-white p-4 rounded-xl border border-gray-200 text-gray-700"
+          {/* --- PASSWORD COMPONENT --- */}
+          <PasswordInput
             placeholder="Enter your password"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
           />
         </View>
 

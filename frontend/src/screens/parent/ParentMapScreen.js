@@ -6,6 +6,7 @@ import {
   Text,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -15,104 +16,163 @@ import socket from "../../services/socket";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ParentMapScreen = ({ navigation }) => {
-  // Map and Tracking States
   const [region, setRegion] = useState({
-    latitude: 6.9271, // Default: Colombo
+    latitude: 6.9271,
     longitude: 79.8612,
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
 
-  // Separate state specifically for the van's marker
-  const [vanLocation, setVanLocation] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("Waiting for driver...");
-  const [driverId, setDriverId] = useState(null);
+  // --- UPDATED: Group children by Driver ---
+  const [uniqueVans, setUniqueVans] = useState([]);
+  const [activeVanIndex, setActiveVanIndex] = useState(0);
+  const [vanLocations, setVanLocations] = useState({});
 
-  // Reference to the map to allow smooth camera animations
+  const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
 
-  // Step 1: Fetch Driver ID on Component Mount
+  const activeVan = uniqueVans[activeVanIndex];
+  const activeDriverId = activeVan?.driverId;
+
+  // Step 1: Fetch All Children and Group by Driver
   useEffect(() => {
-    const fetchDriverDetails = async () => {
+    const fetchChildrenDetails = async () => {
       try {
         const userId = await AsyncStorage.getItem("userId");
         const childRes = await api.get(`/children/${userId}`);
         const children = childRes.data;
 
-        // Check if any child has a driver assigned
-        if (children.length > 0 && children[0].driver_id) {
-          setDriverId(children[0].driver_id);
-          setStatus("Connected. Waiting for journey to start...");
+        // Grouping Logic
+        const vansMap = {};
+        children.forEach((child) => {
+          if (child.driver_id) {
+            // Only add if a driver is assigned
+            if (!vansMap[child.driver_id]) {
+              vansMap[child.driver_id] = {
+                driverId: child.driver_id,
+                childNames: [child.name],
+              };
+            } else {
+              vansMap[child.driver_id].childNames.push(child.name);
+            }
+          }
+        });
+
+        const vansArray = Object.values(vansMap);
+
+        if (vansArray.length > 0) {
+          setUniqueVans(vansArray);
         } else {
           setLoading(false);
-          setStatus("No Driver Assigned");
           Alert.alert(
             "Notice",
-            "No driver is currently assigned to your child.",
+            "No drivers currently assigned to your children.",
           );
         }
       } catch (error) {
-        console.error("Error fetching driver:", error);
+        console.error("Error fetching children:", error);
         setLoading(false);
       }
     };
 
-    fetchDriverDetails();
+    fetchChildrenDetails();
   }, []);
 
-  // Step 2: Setup Socket Listener once Driver ID is found
+  // Step 2: Setup Socket Listeners for unique drivers
   useEffect(() => {
-    if (!driverId) return;
+    if (uniqueVans.length === 0) return;
 
-    // Convert to strict string to ensure exact matching with backend
-    const safeDriverId = String(driverId).trim();
-    console.log("Setting up live tracking for Driver ID:", safeDriverId);
+    uniqueVans.forEach((van) => {
+      const safeDriverId = String(van.driverId).trim();
 
-    // Listen for incoming location updates from this specific driver
-    socket.on(`receiveLocation_${safeDriverId}`, (data) => {
-      console.log("Live Location Received:", data.latitude, data.longitude);
-
-      const newCoordinate = {
-        latitude: data.latitude,
-        longitude: data.longitude,
-      };
-
-      // Update the van's marker position
-      setVanLocation(newCoordinate);
-      setLoading(false);
-      setStatus("Live Tracking Active 🚐");
-
-      // Smoothly animate the map camera to follow the van
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            ...newCoordinate,
-            latitudeDelta: 0.005, // Zoom level
-            longitudeDelta: 0.005,
+      socket.on(`receiveLocation_${safeDriverId}`, (data) => {
+        setVanLocations((prev) => ({
+          ...prev,
+          [safeDriverId]: {
+            latitude: data.latitude,
+            longitude: data.longitude,
           },
-          1000, // 1-second smooth glide animation
-        );
-      }
+        }));
+        setLoading(false);
+      });
+
+      socket.on(`journeyEnded_${safeDriverId}`, () => {
+        setVanLocations((prev) => ({
+          ...prev,
+          [safeDriverId]: null,
+        }));
+      });
     });
 
-    // Listen for journey end signal
-    socket.on(`journeyEnded_${safeDriverId}`, () => {
-      console.log("Driver ended the journey");
-      setVanLocation(null); // Hide the van marker from the map
-      setStatus("Journey Ended / Offline");
-      setLoading(false);
-    });
-
-    // Cleanup listeners when the parent leaves the map screen
     return () => {
-      socket.off(`receiveLocation_${safeDriverId}`);
-      socket.off(`journeyEnded_${safeDriverId}`);
+      uniqueVans.forEach((van) => {
+        const safeDriverId = String(van.driverId).trim();
+        socket.off(`receiveLocation_${safeDriverId}`);
+        socket.off(`journeyEnded_${safeDriverId}`);
+      });
     };
-  }, [driverId]);
+  }, [uniqueVans]);
+
+  // Step 3: Animate Camera smoothly
+  useEffect(() => {
+    if (activeDriverId && vanLocations[activeDriverId] && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          ...vanLocations[activeDriverId],
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        },
+        1000, // 1-second smooth glide
+      );
+    }
+  }, [activeVanIndex, vanLocations, activeDriverId]);
+
+  let currentStatus = "Loading...";
+  if (!activeDriverId) {
+    currentStatus = "No Driver Assigned";
+  } else if (!vanLocations[activeDriverId]) {
+    currentStatus = "Waiting for driver to start journey...";
+  } else {
+    currentStatus = "Live Tracking Active 🚐";
+  }
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Show Tabs ONLY if there are multiple unique vans */}
+      {uniqueVans.length > 1 && (
+        <View style={styles.tabContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 15 }}
+          >
+            {uniqueVans.map((van, index) => (
+              <TouchableOpacity
+                key={van.driverId}
+                onPress={() => setActiveVanIndex(index)}
+                style={[
+                  styles.tab,
+                  activeVanIndex === index
+                    ? styles.activeTab
+                    : styles.inactiveTab,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeVanIndex === index
+                      ? styles.activeTabText
+                      : styles.inactiveTabText,
+                  ]}
+                >
+                  {van.childNames.join(" & ")}'s Van
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -120,11 +180,10 @@ const ParentMapScreen = ({ navigation }) => {
         initialRegion={region}
         showsUserLocation={true}
       >
-        {/* Render the Van Marker ONLY if we have received a valid location */}
-        {vanLocation && (
+        {activeDriverId && vanLocations[activeDriverId] && (
           <Marker
-            coordinate={vanLocation}
-            title="School Van"
+            coordinate={vanLocations[activeDriverId]}
+            title={`${activeVan?.childNames.join(" & ")}'s Van`}
             anchor={{ x: 0.5, y: 0.5 }}
           >
             <View className="bg-blue-600 p-2 rounded-full border-2 border-white shadow-lg">
@@ -138,7 +197,6 @@ const ParentMapScreen = ({ navigation }) => {
         )}
       </MapView>
 
-      {/* Floating Back Button */}
       <TouchableOpacity
         onPress={() => navigation.goBack()}
         style={styles.backButton}
@@ -146,20 +204,15 @@ const ParentMapScreen = ({ navigation }) => {
         <Ionicons name="arrow-back" size={28} color="black" />
       </TouchableOpacity>
 
-      {/* Info & Status Overlay */}
       <View style={styles.infoBox}>
-        <Text style={styles.statusText}>Status: {status}</Text>
+        <Text style={styles.statusText}>Status: {currentStatus}</Text>
 
-        {/* Show loading indicator while waiting for the first GPS ping */}
-        {loading && driverId && (
+        {loading && activeDriverId && !vanLocations[activeDriverId] && (
           <View
             style={{ flexDirection: "row", marginTop: 8, alignItems: "center" }}
           >
             <ActivityIndicator size="small" color="#2563EB" />
-            <Text style={styles.timeText}>
-              {" "}
-              Waiting for van's GPS signal...
-            </Text>
+            <Text style={styles.timeText}> Waiting for GPS signal...</Text>
           </View>
         )}
       </View>
@@ -168,19 +221,53 @@ const ParentMapScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { ...StyleSheet.absoluteFillObject },
+  container: { flex: 1, backgroundColor: "#F3F4F6" },
+  map: { flex: 1 },
+  tabContainer: {
+    position: "absolute",
+    top: 60,
+    zIndex: 10,
+    width: "100%",
+    paddingLeft: 60,
+  },
+  tab: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    marginRight: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+  activeTab: {
+    backgroundColor: "#2563EB",
+  },
+  inactiveTab: {
+    backgroundColor: "white",
+  },
+  tabText: {
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  activeTabText: {
+    color: "white",
+  },
+  inactiveTabText: {
+    color: "#4B5563",
+  },
   backButton: {
     position: "absolute",
     top: 50,
-    left: 20,
+    left: 15,
     backgroundColor: "white",
-    padding: 12,
+    padding: 10,
     borderRadius: 50,
     elevation: 5,
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 5,
+    zIndex: 20,
   },
   infoBox: {
     position: "absolute",

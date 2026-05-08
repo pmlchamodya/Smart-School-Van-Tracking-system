@@ -9,7 +9,7 @@ import {
   Image,
   Modal,
   TextInput,
-  Keyboard, // <-- Make sure Keyboard is imported
+  Keyboard,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
@@ -280,6 +280,7 @@ const DriverDashboard = ({ navigation }) => {
     }
   };
 
+  // --- UPDATED: Broadcast Alert to show Driver info in the Title ---
   const sendBroadcastAlert = (message) => {
     Keyboard.dismiss();
     if (!message) {
@@ -294,10 +295,14 @@ const DriverDashboard = ({ navigation }) => {
       return;
     }
 
+    const vehicleTitle = vanDetails?.vehicleNo
+      ? ` (Van: ${vanDetails.vehicleNo})`
+      : "";
+
     uniqueParentIds.forEach((parentId) => {
       socket.emit("notify_parent", {
         parentId: parentId,
-        title: "🚨 URGENT: Driver Update",
+        title: `🚨 Message from ${driverName}${vehicleTitle}`,
         message: message,
       });
     });
@@ -532,14 +537,13 @@ const DriverDashboard = ({ navigation }) => {
         <View className="mb-10"></View>
       </ScrollView>
 
-      {/* --- FIXED: Broadcast Alert Modal (Keyboard Dismissing properly) --- */}
+      {/* Broadcast Alert Modal */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={alertModalVisible}
         onRequestClose={() => setAlertModalVisible(false)}
       >
-        {/* Background Overlay - Tapping this dismisses keyboard */}
         <TouchableOpacity
           style={{
             flex: 1,
@@ -550,7 +554,6 @@ const DriverDashboard = ({ navigation }) => {
           activeOpacity={1}
           onPress={() => Keyboard.dismiss()}
         >
-          {/* White Card - Tapping ANYWHERE inside the white card (except buttons) dismisses keyboard */}
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => Keyboard.dismiss()}
@@ -586,7 +589,6 @@ const DriverDashboard = ({ navigation }) => {
               parents instantly.
             </Text>
 
-            {/* Quick Templates */}
             <TouchableOpacity
               onPress={() =>
                 sendBroadcastAlert(
@@ -626,7 +628,6 @@ const DriverDashboard = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
 
-            {/* Custom Message Input */}
             <Text className="text-gray-600 font-bold mb-2 text-xs uppercase">
               Or type custom message:
             </Text>
@@ -639,7 +640,6 @@ const DriverDashboard = ({ navigation }) => {
               onChangeText={setCustomAlertMsg}
             />
 
-            {/* Send Button */}
             <TouchableOpacity
               onPress={() => sendBroadcastAlert(customAlertMsg)}
               className="bg-red-500 p-4 rounded-xl mt-4 items-center flex-row justify-center"

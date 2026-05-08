@@ -108,7 +108,7 @@ const ParentDashboard = ({ navigation }) => {
   const handleRemoveDriver = (child) => {
     Alert.alert(
       "Remove Transport",
-      `Are you sure you want to unassign the current school van for ${child.name}?`,
+      `Are you sure you want to unassign the current school van for ${child.name}`, // මෙතන අන්තිමට තිබුණු "?" ලකුණ දැන් අයින් කරලා තියෙන්නේ
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -233,7 +233,7 @@ const ParentDashboard = ({ navigation }) => {
             <MaterialIcons name="receipt-long" size={28} color="white" />
             <View className="ml-3">
               <Text className="text-white font-bold text-lg">
-                My Bills & Payments
+                My Payments & Bills
               </Text>
               <Text className="text-green-100 text-sm">
                 Pay van fees & view receipts
@@ -294,14 +294,14 @@ const ParentDashboard = ({ navigation }) => {
                         </Text>
                       </View>
 
-                      {/* NEW: Remove Driver Button */}
+                      {/* Remove Driver Button */}
                       <TouchableOpacity
                         onPress={() => handleRemoveDriver(child)}
                         className="bg-red-50 px-2 py-1 rounded-md flex-row items-center border border-red-100"
                       >
-                        <MaterialCommunityIcons
-                          name="bus-off"
-                          size={14}
+                        <Ionicons
+                          name="close-circle"
+                          size={16}
                           color="#DC2626"
                         />
                         <Text className="text-red-600 font-bold text-xs ml-1">
