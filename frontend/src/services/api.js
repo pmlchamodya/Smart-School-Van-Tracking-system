@@ -6,8 +6,8 @@ import { Platform } from "react-native";
 
 // your computer's local IP address
 //const BASE_URL = "http://192.168.1.3:5000/api";
-const BASE_URL = "http://172.20.10.2:5000/api";
-//const BASE_URL = "http://192.168.1.6:5000/api";
+//const BASE_URL = "http://172.20.10.2:5000/api";
+const BASE_URL = "http://192.168.1.6:5000/api";
 //const BASE_URL = "http://10.16.139.205:5000/api";
 //const BASE_URL = "http://192.168.1.100:5000/api";
 

@@ -1,15 +1,34 @@
 const express = require("express");
 const router = express.Router();
-const { registerUser, authUser } = require("../controllers/userController");
+const {
+  registerUser,
+  authUser,
+  getMe,
+  adminAddDriver,
+} = require("../controllers/userController");
 const User = require("../models/User");
 const Child = require("../models/Child");
 const bcrypt = require("bcryptjs");
 
-// --- Register a new user ---
+// Import Security Middlewares
+const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+
+// --- Register a new user (Public) ---
 router.post("/register", registerUser);
 
-// --- Login & Authenticate ---
+// --- Login & Authenticate (Public) ---
 router.post("/login", authUser);
+
+// --- Get Current Logged In User Profile (Protected) ---
+router.get("/me", protect, getMe);
+
+// --- Admin Add Driver (Protected - Admin Only) ---
+router.post(
+  "/admin/add-driver",
+  protect,
+  authorizeRoles("admin"),
+  adminAddDriver,
+);
 
 // --- Get User Profile ---
 router.get("/profile/:id", async (req, res) => {
@@ -92,9 +111,7 @@ router.put("/change-password/:id", async (req, res) => {
     }
 
     // 2. Set New Password
-    // The pre('save') hook in User.js will automatically encrypt this
     user.password = newPassword;
-
     await user.save();
 
     res.json({ message: "Password updated successfully" });
@@ -107,24 +124,17 @@ router.put("/change-password/:id", async (req, res) => {
 // --- Get Drivers with Seat Availability ---
 router.get("/drivers/search", async (req, res) => {
   try {
-    // 1. Find all users who are drivers
     const drivers = await User.find({ role: "driver" }).select("-password");
 
-    // 2. Calculate seat availability for each driver
     const driversWithStats = await Promise.all(
       drivers.map(async (driver) => {
-        // Count how many children are assigned to this driver
         const currentStudentCount = await Child.countDocuments({
           driver_id: driver._id,
         });
 
-        // Get total seats from driver details (Default to 0 if not set)
         const totalSeats = driver.vanDetails?.seats || 0;
-
-        // Calculate remaining seats
         const availableSeats = totalSeats - currentStudentCount;
 
-        // Return driver object with extra stats
         return {
           ...driver.toObject(),
           currentStudentCount,
@@ -141,7 +151,7 @@ router.get("/drivers/search", async (req, res) => {
   }
 });
 
-// --- NEW: Save Expo Push Token ---
+// --- Save Expo Push Token ---
 router.put("/update-token", async (req, res) => {
   try {
     const { userId, pushToken } = req.body;
@@ -169,23 +179,13 @@ router.put("/update-token", async (req, res) => {
   }
 });
 
-// --- NEW: Admin Dashboard Statistics ---
-// Get total counts for Drivers, Parents, Students, and Vehicles
+// --- Admin Dashboard Statistics ---
 router.get("/admin/stats", async (req, res) => {
   try {
-    // 1. Get total number of Drivers
     const totalDrivers = await User.countDocuments({ role: "driver" });
-
-    // 2. Get total number of Parents
     const totalParents = await User.countDocuments({ role: "parent" });
-
-    // 3. Get total number of Students (Children)
-    // For this, we count the total items in the Child collection
-    const Child = require("../models/Child"); // Make sure Child model is imported if not already at the top
+    const Child = require("../models/Child");
     const totalStudents = await Child.countDocuments();
-
-    // 4. Get active vans (Assuming every driver has a van)
-    // You can customize this if you have a separate vehicle logic
     const activeVans = totalDrivers;
 
     res.json({
@@ -200,11 +200,9 @@ router.get("/admin/stats", async (req, res) => {
   }
 });
 
-// --- NEW: Admin - Manage Drivers APIs ---
-// 1. Get All Drivers
+// --- Admin - Manage Drivers APIs ---
 router.get("/admin/drivers", async (req, res) => {
   try {
-    // Fetch all users where role is 'driver', excluding their passwords for security
     const drivers = await User.find({ role: "driver" }).select("-password");
     res.json(drivers);
   } catch (error) {
@@ -213,7 +211,6 @@ router.get("/admin/drivers", async (req, res) => {
   }
 });
 
-// 2. Delete a Driver
 router.delete("/admin/drivers/:id", async (req, res) => {
   try {
     const driverId = req.params.id;
@@ -225,10 +222,9 @@ router.delete("/admin/drivers/:id", async (req, res) => {
   }
 });
 
-// --- NEW: Admin - Get All Parents ---
+// --- Admin - Get All Parents ---
 router.get("/admin/parents", async (req, res) => {
   try {
-    // Fetch all users where role is 'parent', excluding their passwords
     const parents = await User.find({ role: "parent" }).select("-password");
     res.json(parents);
   } catch (error) {
@@ -237,11 +233,10 @@ router.get("/admin/parents", async (req, res) => {
   }
 });
 
-// --- NEW: Admin - Delete a Parent ---
+// --- Admin - Delete a Parent ---
 router.delete("/admin/parents/:id", async (req, res) => {
   try {
     const parentId = req.params.id;
-    // Find the parent by ID and delete from the database
     await User.findByIdAndDelete(parentId);
     res.json({ message: "Parent removed successfully" });
   } catch (error) {
@@ -250,12 +245,10 @@ router.delete("/admin/parents/:id", async (req, res) => {
   }
 });
 
-// --- NEW: Admin - Get All Students ---
+// --- Admin - Get All Students ---
 router.get("/admin/students", async (req, res) => {
   try {
-    const Child = require("../models/Child"); // Ensure Child model is imported
-
-    // Fetch all children and also grab their parent's and driver's basic info
+    const Child = require("../models/Child");
     const students = await Child.find()
       .populate("parent_id", "name phoneNumber")
       .populate("driver_id", "name vanDetails");
@@ -267,7 +260,7 @@ router.get("/admin/students", async (req, res) => {
   }
 });
 
-// --- NEW: Admin - Delete a Student ---
+// --- Admin - Delete a Student ---
 router.delete("/admin/students/:id", async (req, res) => {
   try {
     const Child = require("../models/Child");
