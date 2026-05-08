@@ -14,6 +14,14 @@ const userSchema = mongoose.Schema(
       enum: ["admin", "driver", "parent"],
       default: "parent",
     },
+    resetOTP: {
+      type: String,
+      default: null,
+    },
+    otpExpires: {
+      type: Date,
+      default: null,
+    },
 
     // --- Personal Details (Common) ---
     phone: { type: String },
@@ -58,6 +66,15 @@ const userSchema = mongoose.Schema(
         studentId: String,
       },
     ],
+    // Add these fields to the userSchema inside User.js
+    resetOTP: {
+      type: String,
+      default: null,
+    },
+    otpExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

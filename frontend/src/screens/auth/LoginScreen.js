@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import api from "../../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -99,13 +100,17 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50 justify-center px-6">
-      {/* Title */}
+      {/* Title  and Logo */}
       <View className="items-center mb-10">
-        <View className="w-20 h-20 bg-blue-500 rounded-full items-center justify-center mb-4 shadow-lg">
-          <Text className="text-white text-4xl font-bold">V</Text>
-        </View>
+        <Image
+          source={require("../../../assets/SmartSchoolVanTracker.png")}
+          style={{ width: 250, height: 250, resizeMode: "contain" }}
+          padding={20}
+        />
         <Text className="text-3xl font-bold text-gray-800">Welcome Back!</Text>
-        <Text className="text-gray-500 mt-2">Sign in to Smart Van Tracker</Text>
+        <Text className="text-black-500 mt-2">
+          Sign in to Smart School Van Tracker
+        </Text>
       </View>
 
       {/* Input Fields */}
@@ -134,6 +139,13 @@ const LoginScreen = ({ navigation }) => {
             value={password}
             onChangeText={setPassword}
           />
+          {/* Forgot Password Link */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ForgotPassword")}
+            className="mt-2 self-end"
+          >
+            <Text className="text-blue-600 font-medium">Forgot Password?</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity

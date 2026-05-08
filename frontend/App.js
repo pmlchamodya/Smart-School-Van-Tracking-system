@@ -7,8 +7,11 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 // Import Screens
+import SplashScreen from "./src/screens/common/SplashScreen";
 import LoginScreen from "./src/screens/auth/LoginScreen";
 import RegisterScreen from "./src/screens/auth/RegisterScreen";
+import ForgotPasswordScreen from "./src/screens/auth/ForgotPasswordScreen";
+import VerifyOTPScreen from "./src/screens/auth/VerifyOTPScreen";
 import AdminDashboard from "./src/screens/admin/AdminDashboard";
 import DriverDashboard from "./src/screens/driver/DriverDashboard";
 import ParentDashboard from "./src/screens/parent/ParentDashboard";
@@ -166,7 +169,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="Login">
+        <Stack.Navigator initialRouteName="Splash">
+          {/* --- Splash Screen --- */}
+          <Stack.Screen
+            name="Splash"
+            component={SplashScreen}
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="Login"
             component={LoginScreen}
@@ -176,6 +185,16 @@ export default function App() {
             name="Register"
             component={RegisterScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+            options={{ title: "Reset Password" }}
+          />
+          <Stack.Screen
+            name="VerifyOTP"
+            component={VerifyOTPScreen}
+            options={{ title: "Verify OTP" }}
           />
 
           <Stack.Screen

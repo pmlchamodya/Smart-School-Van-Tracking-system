@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from "react-native";
 import api from "../../services/api";
 import PasswordInput from "../../components/inputs/PasswordInput";
@@ -20,9 +21,7 @@ const RegisterScreen = ({ navigation }) => {
   const [role, setRole] = useState("parent");
   const [loading, setLoading] = useState(false);
 
-  // Function to handle registration
   const handleRegister = async () => {
-    // 1. Basic Validation
     if (!name || !email || !phoneNumber || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -31,7 +30,6 @@ const RegisterScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // 2. Send data to Backend
       const response = await api.post("/users/register", {
         name,
         email,
@@ -40,7 +38,6 @@ const RegisterScreen = ({ navigation }) => {
         role,
       });
 
-      // 3. If successful
       if (response.status === 201) {
         Alert.alert("Success", "Account created successfully!", [
           { text: "Login Now", onPress: () => navigation.navigate("Login") },
@@ -49,7 +46,6 @@ const RegisterScreen = ({ navigation }) => {
     } catch (error) {
       console.log(error);
       if (error.response) {
-        // Backend returned an error (e.g., User already exists)
         Alert.alert("Registration Failed", error.response.data.message);
       } else {
         Alert.alert("Error", "Something went wrong. Check your connection.");
@@ -61,6 +57,14 @@ const RegisterScreen = ({ navigation }) => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* --- LOGO --- */}
+      <View style={styles.logoContainer}>
+        <Image
+          source={require("../../../assets/SmartSchoolVanTracker.png")}
+          style={{ width: 200, height: 200, resizeMode: "contain" }}
+        />
+      </View>
+
       <Text style={styles.title}>Create Account</Text>
       <Text style={styles.subtitle}>
         Join as a {role === "parent" ? "Parent" : "Driver"}
@@ -128,7 +132,6 @@ const RegisterScreen = ({ navigation }) => {
         keyboardType="phone-pad"
       />
 
-      {/* --- PASSWORD COMPONENT --- */}
       <PasswordInput
         placeholder="Password"
         value={password}
@@ -162,6 +165,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
     backgroundColor: "#f5f5f5",
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    resizeMode: "contain",
   },
   title: {
     fontSize: 28,

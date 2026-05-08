@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 
 // Generate JWT Token using the secret from .env
 const generateToken = (id) => {
@@ -133,4 +134,106 @@ const adminAddDriver = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, authUser, getMe, adminAddDriver };
+// @desc    Send 6-digit OTP to user's email for password reset
+// @route   POST /api/users/send-otp
+const sendOTP = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "User not found with this email" });
+    }
+
+    // Generate a secure 6-digit random OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save OTP and expiration (10 minutes) to user record
+    user.resetOTP = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    // Configure Nodemailer transporter using environment variables
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Email content with OTP code
+    const mailOptions = {
+      from: `"Smart School Van Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Password Reset Verification Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px; max-width: 500px;">
+          <h2 style="color: #2563EB; text-align: center;">Verification Code</h2>
+          <p>Hello ${user.name},</p>
+          <p>You requested to reset your password. Use the following OTP to verify your account:</p>
+          <div style="background: #f3f4f6; padding: 15px; text-align: center; border-radius: 5px;">
+            <h1 style="letter-spacing: 10px; color: #1e40af; margin: 0;">${otp}</h1>
+          </div>
+          <p style="margin-top: 15px; color: #666;">This code is valid for 10 minutes only. If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    };
+
+    // Send the email
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: "OTP sent successfully to your email" });
+  } catch (error) {
+    console.error("Send OTP Error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to send OTP. Check email settings." });
+  }
+};
+
+// @desc    Verify OTP and update user's password
+// @route   POST /api/users/reset-password
+const resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  try {
+    // Check for user with matching email, OTP, and valid expiration date
+    const user = await User.findOne({
+      email,
+      resetOTP: otp,
+      otpExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP code" });
+    }
+
+    // Update the password (hashed via pre-save middleware in User model)
+    user.password = newPassword;
+
+    // Clear the OTP fields after successful reset
+    user.resetOTP = null;
+    user.otpExpires = null;
+    await user.save();
+
+    res
+      .status(200)
+      .json({ message: "Password reset successful! You can now log in." });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    res
+      .status(500)
+      .json({ message: "An error occurred during password reset" });
+  }
+};
+
+module.exports = {
+  registerUser,
+  authUser,
+  getMe,
+  adminAddDriver,
+  sendOTP,
+  resetPassword,
+};

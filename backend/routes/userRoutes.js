@@ -5,6 +5,8 @@ const {
   authUser,
   getMe,
   adminAddDriver,
+  sendOTP,
+  resetPassword,
 } = require("../controllers/userController");
 const User = require("../models/User");
 const Child = require("../models/Child");
@@ -18,6 +20,10 @@ router.post("/register", registerUser);
 
 // --- Login & Authenticate (Public) ---
 router.post("/login", authUser);
+
+// --- OTP & Password Reset Routes (New) ---
+router.post("/send-otp", sendOTP);
+router.post("/reset-password", resetPassword);
 
 // --- Get Current Logged In User Profile (Protected) ---
 router.get("/me", protect, getMe);
