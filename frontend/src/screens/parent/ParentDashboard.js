@@ -32,10 +32,7 @@ const ParentDashboard = ({ navigation }) => {
       const userId = await AsyncStorage.getItem("userId");
 
       if (userId) {
-        // 1. Join personal socket room to receive private notifications
         socket.emit("join", userId);
-
-        // 2. Listen for incoming notifications from the driver
         socket.on("receive_notification", (data) => {
           Alert.alert(data.title, data.message, [
             { text: "Awesome! Thanks 👍" },
@@ -45,8 +42,6 @@ const ParentDashboard = ({ navigation }) => {
     };
 
     setupSocket();
-
-    // Cleanup when component unmounts
     return () => {
       socket.off("receive_notification");
     };
@@ -58,14 +53,12 @@ const ParentDashboard = ({ navigation }) => {
       const userId = await AsyncStorage.getItem("userId");
 
       if (userId) {
-        // 1. Fetch User Profile
         const userRes = await api.get(`/users/profile/${userId}`);
         if (userRes.data) {
           setParentName(userRes.data.name);
           setProfileImage(userRes.data.profileImage);
         }
 
-        // 2. Fetch Children List
         const childRes = await api.get(`/children/${userId}`);
         setChildren(childRes.data);
       }
@@ -111,33 +104,69 @@ const ParentDashboard = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  // --- Delete Child Logic ---
-  const handleDeleteChild = (childId) => {
-    Alert.alert("Delete Child", "Are you sure you want to remove this child?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/children/${childId}`);
-            Alert.alert("Success", "Child removed successfully");
-            loadData();
-          } catch (error) {
-            if (
-              error.response &&
-              error.response.data &&
-              error.response.data.message
-            ) {
-              Alert.alert("Cannot Remove ❌", error.response.data.message);
-            } else {
-              console.log(error);
-              Alert.alert("Error", "Failed to delete child");
+  // --- NEW: Remove Driver ONLY (Keep Child) ---
+  const handleRemoveDriver = (child) => {
+    Alert.alert(
+      "Remove Transport",
+      `Are you sure you want to unassign the current school van for ${child.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Unassign",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // We send a PUT request to update the driver_id to null
+              await api.put(`/children/${child._id}`, {
+                driver_id: null,
+                status: "safe", // Reset status back to safe just in case
+              });
+              Alert.alert(
+                "Success",
+                "Van removed successfully. You can now select a new van.",
+              );
+              loadData(); // Refresh list to show "Find Transport" button
+            } catch (error) {
+              console.error("Error removing driver:", error);
+              Alert.alert("Error", "Failed to remove the driver.");
             }
-          }
+          },
         },
-      },
-    ]);
+      ],
+    );
+  };
+
+  // --- Delete Child Completely Logic ---
+  const handleDeleteChild = (childId) => {
+    Alert.alert(
+      "Delete Child",
+      "Are you sure you want to entirely remove this child from the system?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.delete(`/children/${childId}`);
+              Alert.alert("Success", "Child removed successfully");
+              loadData();
+            } catch (error) {
+              if (
+                error.response &&
+                error.response.data &&
+                error.response.data.message
+              ) {
+                Alert.alert("Cannot Remove ❌", error.response.data.message);
+              } else {
+                console.log(error);
+                Alert.alert("Error", "Failed to delete child");
+              }
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -251,16 +280,34 @@ const ParentDashboard = ({ navigation }) => {
                     {child.school} - {child.grade}
                   </Text>
 
+                  {/* Dynamic Van Status Area */}
                   {child.driver_id ? (
-                    <View className="bg-green-100 px-2 py-1 rounded-md self-start mt-2 flex-row items-center">
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={14}
-                        color="green"
-                      />
-                      <Text className="text-green-700 font-bold text-xs ml-1">
-                        Van Assigned
-                      </Text>
+                    <View className="flex-row items-center mt-2">
+                      <View className="bg-green-100 px-2 py-1 rounded-md flex-row items-center mr-2">
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={14}
+                          color="green"
+                        />
+                        <Text className="text-green-700 font-bold text-xs ml-1">
+                          Van Assigned
+                        </Text>
+                      </View>
+
+                      {/* NEW: Remove Driver Button */}
+                      <TouchableOpacity
+                        onPress={() => handleRemoveDriver(child)}
+                        className="bg-red-50 px-2 py-1 rounded-md flex-row items-center border border-red-100"
+                      >
+                        <MaterialCommunityIcons
+                          name="bus-off"
+                          size={14}
+                          color="#DC2626"
+                        />
+                        <Text className="text-red-600 font-bold text-xs ml-1">
+                          Remove Van
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   ) : (
                     <TouchableOpacity
@@ -281,6 +328,7 @@ const ParentDashboard = ({ navigation }) => {
                   )}
                 </View>
 
+                {/* Right Side Action Buttons */}
                 <View className="flex-row items-center mt-1">
                   <TouchableOpacity
                     onPress={() =>
@@ -312,6 +360,7 @@ const ParentDashboard = ({ navigation }) => {
                 </View>
               </View>
 
+              {/* Attendance Toggle */}
               <TouchableOpacity
                 className={`mt-4 py-3 px-4 rounded-xl items-center justify-center border ${
                   child.isAbsent

@@ -27,9 +27,22 @@ const ManageDriversScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredDrivers, setFilteredDrivers] = useState([]);
 
-  // --- NEW: State for Driver Profile Modal ---
-  const [modalVisible, setModalVisible] = useState(false);
+  // --- Profile Modal State ---
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
+
+  // --- Add Driver Modal State (RESTORED) ---
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [addingDriver, setAddingDriver] = useState(false);
+  const [newDriver, setNewDriver] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+    vehicleNo: "",
+    seats: "",
+    routes: "",
+  });
 
   // Fetch all drivers
   useEffect(() => {
@@ -50,33 +63,6 @@ const ManageDriversScreen = ({ navigation }) => {
     }
   };
 
-  // Delete a driver
-  const handleDeleteDriver = (driverId, driverName) => {
-    Alert.alert(
-      "Remove Driver",
-      `Are you sure you want to permanently remove ${driverName} from the system?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes, Remove",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.delete(`/users/admin/drivers/${driverId}`);
-              Alert.alert("Success", `${driverName} has been removed.`);
-              setModalVisible(false); // Close modal if open
-              setSearchQuery("");
-              loadDrivers();
-            } catch (error) {
-              console.error("Error deleting driver:", error);
-              Alert.alert("Error", "Failed to remove driver.");
-            }
-          },
-        },
-      ],
-    );
-  };
-
   // Search filter
   const handleSearch = (text) => {
     setSearchQuery(text);
@@ -92,10 +78,103 @@ const ManageDriversScreen = ({ navigation }) => {
     }
   };
 
-  // --- NEW: Open Profile Modal ---
+  // Delete a driver
+  const handleDeleteDriver = (driverId, driverName) => {
+    Alert.alert(
+      "Remove Driver",
+      `Are you sure you want to permanently remove ${driverName} from the system?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.delete(`/users/admin/drivers/${driverId}`);
+              Alert.alert("Success", `${driverName} has been removed.`);
+              setProfileModalVisible(false); // Close modal if open
+              setSearchQuery("");
+              loadDrivers();
+            } catch (error) {
+              console.error("Error deleting driver:", error);
+              Alert.alert("Error", "Failed to remove driver.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Open Profile Modal
   const openDriverProfile = (driver) => {
     setSelectedDriver(driver);
-    setModalVisible(true);
+    setProfileModalVisible(true);
+  };
+
+  // --- RESTORED: Add Driver Functions ---
+  const handleAddDriver = async () => {
+    if (
+      !newDriver.name ||
+      !newDriver.email ||
+      !newDriver.password ||
+      !newDriver.phoneNumber
+    ) {
+      Alert.alert(
+        "Error",
+        "Please fill in all basic driver details (Name, Email, Password, Phone)",
+      );
+      return;
+    }
+    if (!newDriver.vehicleNo || !newDriver.seats) {
+      Alert.alert(
+        "Warning",
+        "It is recommended to add Vehicle No and Seats. Do you want to proceed without them?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Proceed", onPress: submitDriverData },
+        ],
+      );
+      return;
+    }
+    submitDriverData();
+  };
+
+  const submitDriverData = async () => {
+    try {
+      setAddingDriver(true);
+      const response = await api.post("/users/admin/add-driver", {
+        name: newDriver.name,
+        email: newDriver.email,
+        password: newDriver.password,
+        phoneNumber: newDriver.phoneNumber,
+        vehicleNo: newDriver.vehicleNo,
+        seats: newDriver.seats,
+        routes: newDriver.routes,
+      });
+
+      if (response.status === 201) {
+        Alert.alert("Success", "Driver added successfully!");
+        setAddModalVisible(false);
+        setNewDriver({
+          name: "",
+          email: "",
+          phoneNumber: "",
+          password: "",
+          vehicleNo: "",
+          seats: "",
+          routes: "",
+        });
+        loadDrivers();
+      }
+    } catch (error) {
+      console.log("Add Driver Error:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to add driver",
+      );
+    } finally {
+      setAddingDriver(false);
+    }
   };
 
   // UI for a single Driver Card (List Item)
@@ -172,6 +251,20 @@ const ManageDriversScreen = ({ navigation }) => {
         )}
       </View>
 
+      {/* Add New Driver Button */}
+      <TouchableOpacity
+        onPress={() => setAddModalVisible(true)}
+        className="bg-blue-600 py-4 rounded-xl flex-row justify-center items-center mb-6 shadow-md shadow-blue-300"
+      >
+        <Ionicons
+          name="add-circle-outline"
+          size={24}
+          color="white"
+          className="mr-2"
+        />
+        <Text className="text-white font-bold text-lg">Add New Driver</Text>
+      </TouchableOpacity>
+
       {/* Driver List */}
       {loading ? (
         <ActivityIndicator size="large" color="#3B82F6" className="mt-10" />
@@ -195,22 +288,182 @@ const ManageDriversScreen = ({ navigation }) => {
         />
       )}
 
-      {/* --- NEW: Driver Full Profile Modal --- */}
+      {/* --- Add Driver Modal --- */}
+      <Modal
+        visible={addModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView className="flex-1 bg-white">
+          <View className="px-6 py-4 flex-row justify-between items-center border-b border-gray-100">
+            <Text className="text-xl font-bold text-blue-900">
+              Add New Driver
+            </Text>
+            <TouchableOpacity onPress={() => setAddModalVisible(false)}>
+              <Ionicons name="close" size={28} color="gray" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            className="flex-1 px-6 pt-4"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2">
+              Basic Info
+            </Text>
+
+            {/* Full Name Input */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Full Name *
+              </Text>
+              <TextInput
+                placeholder="Enter full name"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.name}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, name: text })
+                }
+              />
+            </View>
+
+            {/* Email Input */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Email Address *
+              </Text>
+              <TextInput
+                placeholder="saman@example.com"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.email}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, email: text })
+                }
+              />
+            </View>
+
+            {/* Phone Number Input */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Phone Number *
+              </Text>
+              <TextInput
+                placeholder="071xxxxxxxx"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.phoneNumber}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, phoneNumber: text })
+                }
+              />
+            </View>
+
+            {/* Password Input */}
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Temporary Password *
+              </Text>
+              <TextInput
+                placeholder="Enter password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.password}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, password: text })
+                }
+              />
+            </View>
+
+            <Text className="font-bold text-lg text-gray-800 mb-4 mt-2 border-b border-gray-100 pb-2">
+              Van Details (Optional)
+            </Text>
+
+            {/* Vehicle Number Input */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Vehicle Number
+              </Text>
+              <TextInput
+                placeholder="WP ND-1234"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.vehicleNo}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, vehicleNo: text })
+                }
+              />
+            </View>
+
+            {/* Total Seats Input */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Total Seats
+              </Text>
+              <TextInput
+                placeholder="14"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.seats}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, seats: text })
+                }
+              />
+            </View>
+
+            {/* Routes Input */}
+            <View className="mb-8">
+              <Text className="text-sm font-semibold text-gray-600 mb-1 ml-1">
+                Routes
+              </Text>
+              <TextInput
+                placeholder="Nugegoda, Maharagama"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-gray-800"
+                value={newDriver.routes}
+                onChangeText={(text) =>
+                  setNewDriver({ ...newDriver, routes: text })
+                }
+              />
+            </View>
+
+            <TouchableOpacity
+              onPress={handleAddDriver}
+              disabled={addingDriver}
+              className={`py-4 rounded-xl flex-row justify-center items-center mb-10 shadow-sm ${addingDriver ? "bg-blue-400" : "bg-blue-600"}`}
+            >
+              {addingDriver ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className="text-white font-bold text-lg">
+                  Save Driver
+                </Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* --- Driver Full Profile Modal --- */}
       <Modal
         animationType="slide"
         transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        visible={profileModalVisible}
+        onRequestClose={() => setProfileModalVisible(false)}
       >
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl h-[85%] p-6">
-            {/* Modal Header & Close Button */}
             <View className="flex-row justify-between items-center mb-6">
               <Text className="text-xl font-bold text-gray-800">
                 Driver Profile
               </Text>
               <TouchableOpacity
-                onPress={() => setModalVisible(false)}
+                onPress={() => setProfileModalVisible(false)}
                 className="bg-gray-100 p-2 rounded-full"
               >
                 <Ionicons name="close" size={24} color="gray" />
@@ -219,7 +472,6 @@ const ManageDriversScreen = ({ navigation }) => {
 
             {selectedDriver && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Profile Image & Name */}
                 <View className="items-center mb-6">
                   <Image
                     source={
@@ -241,7 +493,6 @@ const ManageDriversScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {/* Personal Info Section */}
                 <Text className="text-sm font-bold text-gray-400 uppercase mb-3 ml-1">
                   Personal Details
                 </Text>
@@ -310,7 +561,6 @@ const ManageDriversScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {/* Vehicle & Route Section */}
                 <Text className="text-sm font-bold text-gray-400 uppercase mb-3 ml-1">
                   Vehicle & Route Info
                 </Text>
@@ -369,7 +619,6 @@ const ManageDriversScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {/* Delete Driver Action inside Modal */}
                 <TouchableOpacity
                   onPress={() =>
                     handleDeleteDriver(selectedDriver._id, selectedDriver.name)

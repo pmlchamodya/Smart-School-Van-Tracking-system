@@ -161,6 +161,99 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// --- NEW: Route to Unassign Driver (With Pro-rata Settlement Logic) ---
+router.put("/unassign-driver/:id", async (req, res) => {
+  try {
+    const child = await Child.findById(req.params.id);
+    if (!child) return res.status(404).json({ message: "Child not found" });
+
+    // --- Pro-Rata Billing Logic ---
+    const today = new Date();
+    const currentMonth = today.toISOString().slice(0, 7); // e.g., "2026-04"
+
+    // 1. Check for ANY existing pending bills from PAST months
+    const pastPendingBills = await Payment.find({
+      childId: child._id,
+      status: "Pending",
+      month: { $ne: currentMonth },
+    });
+
+    if (pastPendingBills.length > 0) {
+      return res.status(400).json({
+        message:
+          "Cannot unassign van. Please settle past pending payments first.",
+      });
+    }
+
+    // 2. Calculate Pro-rata for the CURRENT month
+    if (child.driver_id) {
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const joinDate = new Date(child.driverAssignedAt || child.createdAt);
+
+      const calculationStartDate =
+        joinDate > monthStart ? joinDate : monthStart;
+
+      const diffTime = Math.abs(today - calculationStartDate);
+      let daysUsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (daysUsed === 0) daysUsed = 1;
+
+      const DEFAULT_MONTHLY_FEE = 5000;
+      const daysInMonth = new Date(
+        today.getFullYear(),
+        today.getMonth() + 1,
+        0,
+      ).getDate();
+
+      let proRataAmount = Math.round(
+        (DEFAULT_MONTHLY_FEE / daysInMonth) * daysUsed,
+      );
+      if (proRataAmount < 0) proRataAmount = 0;
+      if (proRataAmount > DEFAULT_MONTHLY_FEE)
+        proRataAmount = DEFAULT_MONTHLY_FEE;
+
+      const currentMonthBill = await Payment.findOne({
+        childId: child._id,
+        month: currentMonth,
+      });
+
+      if (currentMonthBill) {
+        if (currentMonthBill.status === "Pending") {
+          currentMonthBill.amount = proRataAmount;
+          await currentMonthBill.save();
+          return res.status(400).json({
+            message: `Final settlement of Rs. ${proRataAmount} is pending for the ${daysUsed} days used this month. Please go to Payments to settle it before removing the van.`,
+          });
+        }
+      } else {
+        if (daysUsed > 0 && proRataAmount > 0) {
+          await Payment.create({
+            childId: child._id,
+            childName: child.name,
+            parentId: child.parent_id,
+            driverId: child.driver_id,
+            month: currentMonth,
+            amount: proRataAmount,
+            status: "Pending",
+          });
+          return res.status(400).json({
+            message: `A final settlement bill of Rs. ${proRataAmount} has been generated. Please pay it in the Payments section before unassigning the van.`,
+          });
+        }
+      }
+    }
+
+    // 3. If no bills pending and no pro-rata owed, unassign safely
+    child.driver_id = null;
+    child.status = "safe"; // Reset status
+    await child.save();
+
+    res.json({ message: "Van unassigned successfully", child });
+  } catch (error) {
+    console.error("Unassign Driver Error:", error);
+    res.status(500).json({ message: "Server Error", error });
+  }
+});
+
 // 5. Route: Update Child Details & Status
 router.put("/:id", async (req, res) => {
   try {

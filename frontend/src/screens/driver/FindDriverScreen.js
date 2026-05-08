@@ -29,11 +29,11 @@ const FindDriverScreen = ({ route, navigation }) => {
       const response = await api.get("/users/drivers/search");
       const allDrivers = response.data;
 
-      // Filter Logic
+      // Filter Logic: Must go to the child's school AND have available seats
       const matchingDrivers = allDrivers.filter((driver) => {
         // 1. Check if Driver goes to Child's School (Case Insensitive)
         const hasSchool = driver.routeDetails?.schools?.some((s) =>
-          s.toLowerCase().includes(child.school.toLowerCase())
+          s.toLowerCase().includes(child.school.toLowerCase()),
         );
 
         // 2. Check if Van is NOT Full
@@ -75,104 +75,144 @@ const FindDriverScreen = ({ route, navigation }) => {
             }
           },
         },
-      ]
+      ],
     );
   };
 
-  const renderDriverCard = ({ item }) => (
-    <View className="bg-white p-4 rounded-2xl mb-4 shadow-sm border border-gray-100">
-      <View className="flex-row items-center">
-        {/* Driver Image */}
-        <Image
-          source={
-            item.profileImage
-              ? { uri: item.profileImage }
-              : { uri: "https://cdn-icons-png.flaticon.com/512/149/149071.png" }
-          }
-          className="w-16 h-16 rounded-full bg-gray-200"
-        />
+  // --- Render Individual Driver Card ---
+  const renderDriverCard = ({ item }) => {
+    // Dynamic logic for seat badge color
+    // If seats are 2 or less, show warning color (Orange), else Green
+    const isFewSeatsLeft = item.availableSeats <= 2;
 
-        <View className="ml-4 flex-1">
-          <View className="flex-row justify-between">
-            <Text className="text-lg font-bold text-gray-800">{item.name}</Text>
-            {/* Seat Badge */}
-            <View className="bg-green-100 px-2 py-1 rounded-lg">
-              <Text className="text-green-700 text-xs font-bold">
-                {item.availableSeats} Seats Left
+    return (
+      <View className="bg-white p-5 rounded-2xl mb-5 shadow-sm border border-gray-100">
+        <View className="flex-row items-center">
+          {/* Driver Profile Image */}
+          <Image
+            source={
+              item.profileImage
+                ? { uri: item.profileImage }
+                : {
+                    uri: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+                  }
+            }
+            className="w-16 h-16 rounded-full bg-gray-200 border-2 border-blue-50"
+          />
+
+          <View className="ml-4 flex-1">
+            <View className="flex-row justify-between items-start">
+              <View>
+                <Text className="text-lg font-bold text-gray-800">
+                  {item.name}
+                </Text>
+                <Text className="text-gray-500 text-xs mt-0.5">
+                  <Ionicons name="call" size={12} /> {item.phoneNumber}
+                </Text>
+              </View>
+
+              {/* Dynamic Seat Availability Badge */}
+              <View
+                className={`px-3 py-1.5 rounded-full ${isFewSeatsLeft ? "bg-orange-100" : "bg-green-100"}`}
+              >
+                <Text
+                  className={`text-[11px] font-extrabold ${isFewSeatsLeft ? "text-orange-700" : "text-green-700"}`}
+                >
+                  {item.availableSeats}{" "}
+                  {item.availableSeats === 1 ? "SEAT" : "SEATS"} LEFT
+                </Text>
+              </View>
+            </View>
+
+            {/* Vehicle Info */}
+            <View className="flex-row items-center mt-3">
+              <MaterialCommunityIcons
+                name="van-passenger"
+                size={16}
+                color="#4B5563"
+              />
+              <Text className="text-gray-700 ml-1.5 font-semibold text-sm">
+                {item.vanDetails?.vehicleNo || "No Vehicle Info"}
+                <Text className="text-gray-400 font-normal">
+                  {" "}
+                  (Total: {item.vanDetails?.seats || 0})
+                </Text>
               </Text>
             </View>
           </View>
+        </View>
 
-          {/* Vehicle Info */}
-          <View className="flex-row items-center mt-1">
-            <MaterialCommunityIcons
-              name="van-passenger"
-              size={16}
-              color="#4B5563"
-            />
-            <Text className="text-gray-600 ml-1 font-semibold">
-              {item.vanDetails?.vehicleNo || "No Vehicle Info"}
+        {/* Route Info (Start - End) */}
+        <View className="bg-blue-50 p-3 rounded-xl mt-4 flex-row items-center border border-blue-100">
+          <Ionicons name="location" size={20} color="#3B82F6" />
+          <View className="ml-2 flex-1">
+            <Text className="text-blue-900 text-sm font-bold">
+              {item.routeDetails?.startLocation || "Start"} ➔{" "}
+              {item.routeDetails?.endLocation || "End"}
             </Text>
-          </View>
-
-          {/* Route Info (Start - End) */}
-          <View className="flex-row items-center mt-1">
-            <Ionicons name="location-outline" size={14} color="gray" />
-            <Text className="text-gray-500 text-xs ml-1 font-bold">
-              {item.routeDetails?.startLocation} ➔{" "}
-              {item.routeDetails?.endLocation}
+            <Text className="text-blue-600 text-[10px] mt-0.5 leading-4">
+              Via: {item.routeDetails?.cities?.join(", ") || "No cities listed"}
             </Text>
           </View>
         </View>
-      </View>
 
-      {/* --- Route Cities (Context for Parent) --- */}
-      <View className="bg-gray-50 p-3 rounded-xl mt-3">
-        <Text className="text-xs text-gray-400 font-bold uppercase mb-1">
-          Passing Through:
-        </Text>
-        <Text className="text-gray-600 text-xs leading-4">
-          {item.routeDetails?.cities?.join(", ") || "No cities listed"}
-        </Text>
+        {/* Select Action Button */}
+        <TouchableOpacity
+          onPress={() => handleSelectDriver(item)}
+          className="bg-[#1E3A8A] mt-4 p-4 rounded-xl items-center shadow-md shadow-blue-900/20"
+        >
+          <Text className="text-white font-bold text-base tracking-wide">
+            Select This Driver
+          </Text>
+        </TouchableOpacity>
       </View>
-
-      {/* Select Button */}
-      <TouchableOpacity
-        onPress={() => handleSelectDriver(item)}
-        className="bg-blue-600 mt-4 p-3 rounded-xl items-center"
-      >
-        <Text className="text-white font-bold">Select This Driver</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50 p-5">
+      {/* Header Section */}
       <View className="flex-row items-center mb-6">
-        <TouchableOpacity onPress={() => navigation.goBack()} className="mr-3">
-          <Ionicons name="arrow-back" size={24} color="black" />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          className="mr-3 bg-white p-2 rounded-full shadow-sm"
+        >
+          <Ionicons name="arrow-back" size={24} color="#1E3A8A" />
         </TouchableOpacity>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">
-            Select Transport
+          <Text className="text-2xl font-extrabold text-gray-800">
+            Find Transport
           </Text>
-          <Text className="text-gray-500 text-xs">
-            Matching vans for {child.school}
+          <Text className="text-gray-500 text-sm mt-0.5">
+            Matching vans for{" "}
+            <Text className="font-bold text-blue-600">{child.school}</Text>
           </Text>
         </View>
       </View>
 
+      {/* Main Content */}
       {loading ? (
-        <ActivityIndicator size="large" color="#2563EB" />
-      ) : drivers.length === 0 ? (
-        <View className="items-center justify-center mt-10">
-          <MaterialCommunityIcons name="bus-alert" size={50} color="#9CA3AF" />
-          <Text className="text-gray-400 mt-3 text-center font-bold">
-            No matching vans found.
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#1E3A8A" />
+          <Text className="text-gray-500 mt-4 font-medium">
+            Finding the best options...
           </Text>
-          <Text className="text-gray-400 text-center text-xs px-10 mt-2">
+        </View>
+      ) : drivers.length === 0 ? (
+        <View className="flex-1 items-center justify-center mb-20">
+          <View className="bg-gray-100 p-6 rounded-full mb-4">
+            <MaterialCommunityIcons
+              name="bus-alert"
+              size={60}
+              color="#9CA3AF"
+            />
+          </View>
+          <Text className="text-gray-800 text-lg font-bold text-center">
+            No matching vans found
+          </Text>
+          <Text className="text-gray-500 text-center text-sm px-8 mt-2">
             We couldn't find any vans going to {child.school} with available
-            seats.
+            seats right now.
           </Text>
         </View>
       ) : (
@@ -181,6 +221,7 @@ const FindDriverScreen = ({ route, navigation }) => {
           keyExtractor={(item) => item._id}
           renderItem={renderDriverCard}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
         />
       )}
     </SafeAreaView>
