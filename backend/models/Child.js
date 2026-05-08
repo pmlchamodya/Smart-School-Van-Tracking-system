@@ -43,7 +43,7 @@ const ChildSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["safe", "in-van", "school", "dropped"],
+    enum: ["safe", "in-van", "school", "returning"],
     default: "safe",
   },
   isAbsent: {

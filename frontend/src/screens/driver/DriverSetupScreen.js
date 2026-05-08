@@ -80,7 +80,7 @@ const DriverSetupScreen = ({ navigation }) => {
 
       if (response.status === 200) {
         Alert.alert("Setup Complete!", "Your details have been saved.");
-        navigation.replace("DriverDashboard");
+        navigation.replace("DriverTabs");
       }
     } catch (error) {
       console.log("Setup Error:", error);

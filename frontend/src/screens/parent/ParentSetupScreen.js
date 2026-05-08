@@ -36,7 +36,7 @@ const ParentSetupScreen = ({ navigation }) => {
       if (response.status === 200) {
         Alert.alert("Setup Complete!", "Your details have been saved.");
         // Redirect to Parent Dashboard
-        navigation.replace("ParentDashboard");
+        navigation.replace("ParentTabs");
       }
     } catch (error) {
       console.log("Setup Error:", error);

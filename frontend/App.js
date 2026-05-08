@@ -1,6 +1,10 @@
+import React from "react";
+import { Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 // Import Screens
 import LoginScreen from "./src/screens/auth/LoginScreen";
@@ -29,173 +33,262 @@ import ManageDriversScreen from "./src/screens/admin/ManageDriversScreen";
 import ManageParentsScreen from "./src/screens/admin/ManageParentsScreen";
 import ManageStudentsScreen from "./src/screens/admin/ManageStudentsScreen";
 import AttendanceReportScreen from "./src/screens/parent/AttendanceReportScreen";
+import DriverStudentsScreen from "./src/screens/driver/DriverStudentsScreen";
+import StudentDetailsScreen from "./src/screens/driver/StudentDetailsScreen";
+import ParentDriversScreen from "./src/screens/parent/ParentDriversScreen";
 
+// Navigation Setup
 const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+// --- Standard Tab Bar ---
+const standardTabStyle = {
+  backgroundColor: "#ffffff",
+  height: Platform.OS === "ios" ? 85 : 65,
+  borderTopWidth: 1,
+  borderTopColor: "#E5E7EB",
+  paddingBottom: Platform.OS === "ios" ? 25 : 10,
+  paddingTop: 10,
+  elevation: 10,
+  shadowColor: "#000",
+  shadowOpacity: 0.1,
+  shadowRadius: 5,
+  shadowOffset: { width: 0, height: -3 },
+};
+
+// 1. Parent Bottom Tabs
+
+function ParentTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: "#2563EB",
+        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "bold", marginTop: -5 },
+        tabBarStyle: standardTabStyle,
+        tabBarIcon: ({ focused, color }) => {
+          let iconName;
+          if (route.name === "ParentHome")
+            iconName = focused ? "home" : "home-outline";
+          else if (route.name === "ParentDrivers")
+            iconName = focused ? "bus" : "bus-outline";
+          else if (route.name === "ParentPayments")
+            iconName = focused ? "receipt" : "receipt-outline";
+          else if (route.name === "ParentProfile")
+            iconName = focused ? "person" : "person-outline";
+          return <Ionicons name={iconName} size={24} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen
+        name="ParentHome"
+        component={ParentDashboard}
+        options={{ title: "Home" }}
+      />
+      <Tab.Screen
+        name="ParentDrivers"
+        component={ParentDriversScreen}
+        options={{ title: "Drivers" }}
+      />
+      <Tab.Screen
+        name="ParentPayments"
+        component={ParentPaymentScreen}
+        options={{ title: "Payments" }}
+      />
+      <Tab.Screen
+        name="ParentProfile"
+        component={ParentProfileScreen}
+        options={{ title: "Profile" }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+// 2. Driver Bottom Tabs
+
+function DriverTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: "#2563EB",
+        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "bold",
+          marginTop: -5,
+        },
+        tabBarStyle: standardTabStyle,
+        tabBarIcon: ({ focused, color }) => {
+          let iconName;
+          if (route.name === "DriverHome")
+            iconName = focused ? "home" : "home-outline";
+          else if (route.name === "DriverStudents")
+            iconName = focused ? "people" : "people-outline";
+          else if (route.name === "DriverPayments")
+            iconName = focused ? "wallet" : "wallet-outline";
+          else if (route.name === "DriverProfile")
+            iconName = focused ? "person" : "person-outline";
+          return <Ionicons name={iconName} size={24} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen
+        name="DriverHome"
+        component={DriverDashboard}
+        options={{ title: "Home" }}
+      />
+      <Tab.Screen
+        name="DriverStudents"
+        component={DriverStudentsScreen}
+        options={{ title: "Students" }}
+      />
+      <Tab.Screen
+        name="DriverPayments"
+        component={DriverPaymentScreen}
+        options={{ title: "Payments" }}
+      />
+      <Tab.Screen
+        name="DriverProfile"
+        component={DriverProfileScreen}
+        options={{ title: "Profile" }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+// Main App Stack
 
 export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Login">
-          {/* Define the Login Screen */}
           <Stack.Screen
             name="Login"
             component={LoginScreen}
             options={{ headerShown: false }}
           />
-          {/* Define the Register Screen */}
           <Stack.Screen
             name="Register"
             component={RegisterScreen}
             options={{ headerShown: false }}
           />
-          {/* Define the Admin Dashboard Screen */}
+
+          <Stack.Screen
+            name="ParentTabs"
+            component={ParentTabs}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="DriverTabs"
+            component={DriverTabs}
+            options={{ headerShown: false }}
+          />
+
           <Stack.Screen
             name="AdminDashboard"
             component={AdminDashboard}
             options={{ headerShown: false }}
           />
-          {/* Define the Manage Drivers Screen */}
           <Stack.Screen
             name="ManageDrivers"
             component={ManageDriversScreen}
             options={{ headerShown: false }}
           />
-          {/* Define the Manage Parents Screen */}
           <Stack.Screen
             name="ManageParents"
             component={ManageParentsScreen}
             options={{ headerShown: false }}
           />
-          {/* Define the Manage Students Screen */}
           <Stack.Screen
             name="ManageStudents"
             component={ManageStudentsScreen}
             options={{ headerShown: false }}
           />
-          {/* Define the Driver Dashboard Screen */}
-          <Stack.Screen
-            name="DriverDashboard"
-            component={DriverDashboard}
-            options={{ headerShown: false }}
-          />
-          {/* Define the Driver Setup Screen */}
+
           <Stack.Screen
             name="DriverSetup"
             component={DriverSetupScreen}
-            options={{ title: "Driver Setup", headerShown: true }}
+            options={{ title: "Driver Setup" }}
           />
-          {/* Define the Driver Profile Screen */}
-          <Stack.Screen
-            name="DriverProfile"
-            component={DriverProfileScreen}
-            options={{ title: "Driver Profile", headerBackTitle: "Back" }}
-          />
-          {/* Define the Edit Driver Profile Screen */}
-          <Stack.Screen
-            name="EditDriverProfile"
-            component={EditDriverProfileScreen}
-            options={{ title: "Edit Driver Details", headerShown: true }}
-          />
-          {/* Define the Driver Map Screen */}
-          <Stack.Screen
-            name="DriverMap"
-            component={DriverMapScreen}
-            options={{ headerShown: false }}
-          />
-          {/* Define the Find Driver Screen */}
-          <Stack.Screen
-            name="FindDriver"
-            component={FindDriverScreen}
-            options={{ headerShown: false }}
-          />
-          {/* Define the Income Report Screen */}
-          <Stack.Screen
-            name="IncomeReport"
-            component={IncomeReportScreen}
-            options={{ headerShown: false }}
-          />
-          {/* Define the Parent Dashboard Screen */}
-          <Stack.Screen
-            name="ParentDashboard"
-            component={ParentDashboard}
-            options={{ headerShown: false }}
-          />
-          {/* Define the Parent Setup Screen */}
           <Stack.Screen
             name="ParentSetup"
             component={ParentSetupScreen}
-            options={{ title: "Parent Setup", headerShown: true }}
+            options={{ title: "Parent Setup" }}
           />
 
-          {/* Define the Add Child Screen */}
           <Stack.Screen
             name="AddChild"
             component={AddChildScreen}
-            options={{ headerShown: true, title: "Add Child" }}
+            options={{ title: "Add Child" }}
           />
-          {/* Define the Edit Child Screen */}
           <Stack.Screen
             name="EditChild"
             component={EditChildScreen}
             options={{ title: "Edit Child" }}
           />
-          {/* Define the Parent Profile Screen */}
           <Stack.Screen
-            name="ParentProfile"
-            component={ParentProfileScreen}
-            options={{ title: "My Profile", headerBackTitle: "Back" }}
+            name="AttendanceReport"
+            component={AttendanceReportScreen}
+            options={{ headerShown: false }}
           />
-          {/* Define the Edit Profile Screen */}
+
           <Stack.Screen
-            name="EditProfile"
-            component={EditProfileScreen}
-            options={{ title: "Edit Profile", headerShown: true }}
+            name="DriverMap"
+            component={DriverMapScreen}
+            options={{ headerShown: false }}
           />
-          {/* Define the Parent Map Screen */}
           <Stack.Screen
             name="ParentMap"
             component={ParentMapScreen}
             options={{ headerShown: false }}
           />
-          {/* Define the Location Picker Screen */}
-          <Stack.Screen
-            name="LocationPicker"
-            component={LocationPickerScreen}
-            options={{ title: "Select Location", headerShown: false }}
-          />
-          {/* Define the Driver Payment Screen */}
-          <Stack.Screen
-            name="DriverPayments"
-            component={DriverPaymentScreen}
-            options={{ headerShown: false }}
-          />
 
-          {/* Define the Parent Payment Screen */}
-          <Stack.Screen
-            name="ParentPayments"
-            component={ParentPaymentScreen}
-            options={{ headerShown: false }}
-          />
-
-          {/* Define the Payment Gateway Screen */}
           <Stack.Screen
             name="PaymentGateway"
             component={PaymentGatewayScreen}
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="IncomeReport"
+            component={IncomeReportScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="LocationPicker"
+            component={LocationPickerScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="FindDriver"
+            component={FindDriverScreen}
+            options={{ headerShown: false }}
+          />
 
-          {/* Define the Change Password Screen */}
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ title: "Edit Profile" }}
+          />
+          <Stack.Screen
+            name="EditDriverProfile"
+            component={EditDriverProfileScreen}
+            options={{ title: "Edit Driver Details" }}
+          />
           <Stack.Screen
             name="ChangePassword"
             component={ChangePasswordScreen}
-            options={{ title: "Change Password", headerShown: true }}
+            options={{ title: "Change Password" }}
           />
-          {/* Define the Attendance Report Screen */}
+
           <Stack.Screen
-            name="AttendanceReport"
-            component={AttendanceReportScreen}
-            options={{ title: "Attendance Report", headerShown: false }}
+            name="StudentDetails"
+            component={StudentDetailsScreen}
+            options={{ headerShown: false }}
           />
         </Stack.Navigator>
       </NavigationContainer>

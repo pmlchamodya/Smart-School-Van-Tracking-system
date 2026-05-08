@@ -43,14 +43,14 @@ const DriverProfileScreen = ({ navigation }) => {
               setNic(user.nic || "Not Set");
               setLicenseNumber(user.licenseNumber || "Not Set");
               setVanDetails(
-                user.vanDetails || { vehicleNo: "Not Set", seats: "0" }
+                user.vanDetails || { vehicleNo: "Not Set", seats: "0" },
               );
               setRouteDetails(
                 user.routeDetails || {
                   startLocation: "N/A",
                   endLocation: "N/A",
                   schools: [],
-                }
+                },
               );
             }
           }
@@ -59,12 +59,16 @@ const DriverProfileScreen = ({ navigation }) => {
         }
       };
       fetchProfileData();
-    }, [])
+    }, []),
   );
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <ScrollView className="p-5" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="p-5"
+        showsVerticalScrollIndicator={false}
+        //contentContainerStyle={{ paddingBottom: 120 }}
+      >
         {/* Header */}
         <View className="items-center mb-6 mt-2">
           <View className="relative">
@@ -84,7 +88,6 @@ const DriverProfileScreen = ({ navigation }) => {
           </Text>
           <Text className="text-gray-500">{email}</Text>
         </View>
-
         {/* Legal Info */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Legal Information
@@ -99,7 +102,6 @@ const DriverProfileScreen = ({ navigation }) => {
             <Text className="text-gray-800 font-bold">{licenseNumber}</Text>
           </View>
         </View>
-
         {/* Vehicle Info */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Vehicle Details
@@ -122,7 +124,6 @@ const DriverProfileScreen = ({ navigation }) => {
             opacity={0.8}
           />
         </View>
-
         {/* Route Info */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Route
@@ -145,12 +146,10 @@ const DriverProfileScreen = ({ navigation }) => {
             ))}
           </View>
         </View>
-
         {/* Settings */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Account Settings
         </Text>
-
         <TouchableOpacity
           onPress={() => navigation.navigate("EditDriverProfile")}
           className="bg-gray-50 p-4 rounded-xl mb-3 flex-row justify-between items-center"
@@ -165,7 +164,6 @@ const DriverProfileScreen = ({ navigation }) => {
           </View>
           <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
         </TouchableOpacity>
-
         {/* Change Password Button */}
         <TouchableOpacity
           onPress={() => navigation.navigate("ChangePassword")}
@@ -179,7 +177,6 @@ const DriverProfileScreen = ({ navigation }) => {
           </View>
           <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
         </TouchableOpacity>
-
         <LogoutButton />
         <View className="mb-6"></View>
       </ScrollView>

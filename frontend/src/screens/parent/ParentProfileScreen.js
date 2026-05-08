@@ -56,7 +56,7 @@ const ParentProfileScreen = ({ navigation }) => {
               setBirthday(
                 user.birthday
                   ? new Date(user.birthday).toDateString()
-                  : "Not Set"
+                  : "Not Set",
               );
               setGender(user.gender || "Not Set");
             }
@@ -69,12 +69,16 @@ const ParentProfileScreen = ({ navigation }) => {
       };
 
       fetchProfileData();
-    }, [])
+    }, []),
   );
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <ScrollView className="p-5" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="p-5"
+        showsVerticalScrollIndicator={false}
+        //contentContainerStyle={{ paddingBottom: 120 }}
+      >
         {/* --- 1. Profile Header --- */}
         <View className="items-center mb-6 mt-2">
           <View className="relative shadow-md">
@@ -97,7 +101,6 @@ const ParentProfileScreen = ({ navigation }) => {
             {role || "Parent"}
           </Text>
         </View>
-
         {/* --- 2. Personal Information Card --- */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Personal Information
@@ -146,7 +149,6 @@ const ParentProfileScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-
         {/* --- 3. Location & Safety Card --- */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Location & Safety
@@ -184,12 +186,10 @@ const ParentProfileScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-
         {/* --- 4. Settings & Actions --- */}
         <Text className="text-gray-400 font-bold mb-3 uppercase text-xs">
           Account Settings
         </Text>
-
         {/* Edit Profile Button */}
         <TouchableOpacity
           onPress={() => navigation.navigate("EditProfile")}
@@ -205,7 +205,6 @@ const ParentProfileScreen = ({ navigation }) => {
           </View>
           <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
         </TouchableOpacity>
-
         {/* Change Password Button */}
         <TouchableOpacity
           onPress={() => navigation.navigate("ChangePassword")}
@@ -219,10 +218,8 @@ const ParentProfileScreen = ({ navigation }) => {
           </View>
           <FontAwesome5 name="chevron-right" size={14} color="#9CA3AF" />
         </TouchableOpacity>
-
         {/* Logout Button */}
         <LogoutButton />
-
         <View className="mb-6"></View>
       </ScrollView>
     </SafeAreaView>

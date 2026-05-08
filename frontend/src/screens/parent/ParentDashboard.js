@@ -84,7 +84,9 @@ const ParentDashboard = ({ navigation }) => {
 
       const targetChild = children.find((c) => c._id === childId);
       if (targetChild && targetChild.driver_id) {
-        socket.emit("attendanceUpdated", { driverId: targetChild.driver_id });
+        socket.emit("attendanceUpdated", {
+          driverId: targetChild.driver_id._id || targetChild.driver_id,
+        });
       }
     } catch (error) {
       console.error("Attendance Update Error:", error);
@@ -104,11 +106,11 @@ const ParentDashboard = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  // --- NEW: Remove Driver ONLY (Keep Child) ---
+  // --- Remove Driver ONLY (Keep Child) ---
   const handleRemoveDriver = (child) => {
     Alert.alert(
       "Remove Transport",
-      `Are you sure you want to unassign the current school van for ${child.name}`, // මෙතන අන්තිමට තිබුණු "?" ලකුණ දැන් අයින් කරලා තියෙන්නේ
+      `Are you sure you want to unassign the current school van for ${child.name}`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -279,6 +281,20 @@ const ParentDashboard = ({ navigation }) => {
                   <Text className="text-gray-500">
                     {child.school} - {child.grade}
                   </Text>
+
+                  {/* --- NEW: Display Van Number --- */}
+                  {child.driver_id && (
+                    <View className="flex-row items-center mt-1">
+                      <MaterialCommunityIcons
+                        name="van-passenger"
+                        size={14}
+                        color="#4B5563"
+                      />
+                      <Text className="text-gray-600 text-xs ml-1 font-bold">
+                        Van No: {child.driver_id.vanDetails?.vehicleNo || "N/A"}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Dynamic Van Status Area */}
                   {child.driver_id ? (

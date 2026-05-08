@@ -64,14 +64,14 @@ const LoginScreen = ({ navigation }) => {
           } else if (role === "driver") {
             // Check if Driver has vehicle details
             if (fullProfile.vanDetails && fullProfile.vanDetails.vehicleNo) {
-              navigation.replace("DriverDashboard");
+              navigation.replace("DriverTabs");
             } else {
               navigation.replace("DriverSetup");
             }
           } else if (role === "parent") {
             // Check if Parent has Address
             if (fullProfile.address) {
-              navigation.replace("ParentDashboard");
+              navigation.replace("ParentTabs");
             } else {
               navigation.replace("ParentSetup");
             }

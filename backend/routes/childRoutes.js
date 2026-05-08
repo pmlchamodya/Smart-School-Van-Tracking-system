@@ -40,7 +40,9 @@ router.post("/add", async (req, res) => {
 // 2. Route: Get Children by Parent ID
 router.get("/:parentId", async (req, res) => {
   try {
-    const children = await Child.find({ parent_id: req.params.parentId });
+    const children = await Child.find({
+      parent_id: req.params.parentId,
+    }).populate("driver_id", "name phoneNumber profileImage vanDetails");
     res.json(children);
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
@@ -51,7 +53,9 @@ router.get("/:parentId", async (req, res) => {
 // Endpoint: GET /api/children/driver/:driverId
 router.get("/driver/:driverId", async (req, res) => {
   try {
-    const children = await Child.find({ driver_id: req.params.driverId });
+    const children = await Child.find({
+      driver_id: req.params.driverId,
+    }).populate("parent_id", "name phoneNumber");
     res.json(children);
   } catch (error) {
     res.status(500).json({ message: "Server Error", error });
@@ -298,10 +302,13 @@ router.put("/:id", async (req, res) => {
 
           if (status === "in-van") {
             title = "Child Picked Up! 🚐";
-            message = `${existingChild.name} has safely boarded the van.`;
+            message = `${existingChild.name} has safely boarded the van to school.`;
           } else if (status === "school") {
             title = "Dropped at School! 🏫";
             message = `${existingChild.name} has been dropped off at school.`;
+          } else if (status === "returning") {
+            title = "Picked Up from School! 🚐";
+            message = `${existingChild.name} is in the van and coming back home.`;
           } else if (status === "safe") {
             title = "Safely Home! 🏡";
             message = `${existingChild.name} has been dropped off at home safely.`;

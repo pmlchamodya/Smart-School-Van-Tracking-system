@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Keyboard,
+  Linking,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
@@ -139,7 +140,7 @@ const DriverDashboard = ({ navigation }) => {
 
           if (distanceInMeters <= 1000 && !notifiedStudents[student._id]) {
             socket.emit("notify_parent", {
-              parentId: student.parent_id,
+              parentId: student.parent_id?._id || student.parent_id,
               title: "Van is arriving soon! ⏰",
               message: `The school van is approx 3 minutes away to pick up ${student.name}. Please get ready!`,
             });
@@ -199,13 +200,48 @@ const DriverDashboard = ({ navigation }) => {
     };
   }, [driverId]);
 
+  // --- NEW: 4-Step Status Logic (safe -> in-van -> school -> returning -> safe) ---
+  const confirmToggleStatus = (child) => {
+    let newStatus =
+      child.status === "safe"
+        ? "in-van"
+        : child.status === "in-van"
+          ? "school"
+          : child.status === "school"
+            ? "returning"
+            : "safe";
+
+    let statusText =
+      newStatus === "in-van"
+        ? "Picked Up (Going to School)"
+        : newStatus === "school"
+          ? "Dropped at School"
+          : newStatus === "returning"
+            ? "Picked Up (Coming Home)"
+            : "Dropped at Home (Safe)";
+
+    Alert.alert(
+      "Confirm Status Change",
+      `Are you sure you want to mark ${child.name} as '${statusText}'?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Update",
+          onPress: () => toggleStudentStatus(child._id, child.status),
+        },
+      ],
+    );
+  };
+
   const toggleStudentStatus = async (childId, currentStatus) => {
     let newStatus =
       currentStatus === "safe"
         ? "in-van"
         : currentStatus === "in-van"
           ? "school"
-          : "safe";
+          : currentStatus === "school"
+            ? "returning"
+            : "safe";
     try {
       await api.put(`/children/${childId}`, { status: newStatus });
       setStudents((prev) =>
@@ -218,18 +254,21 @@ const DriverDashboard = ({ navigation }) => {
         let message = `Status changed to ${newStatus}.`;
 
         if (newStatus === "in-van") {
-          title = "Child Picked Up! 🚐";
+          title = "Picked Up! 🚐";
           message = `${targetChild.name} has safely boarded the van.`;
         } else if (newStatus === "school") {
           title = "Dropped at School! 🏫";
           message = `${targetChild.name} has been dropped off at school.`;
+        } else if (newStatus === "returning") {
+          title = "Picked Up from School! 🚐";
+          message = `${targetChild.name} is in the van and coming back home.`;
         } else if (newStatus === "safe") {
           title = "Safely Home! 🏡";
           message = `${targetChild.name} has been dropped off at home safely.`;
         }
 
         socket.emit("notify_parent", {
-          parentId: targetChild.parent_id,
+          parentId: targetChild.parent_id?._id || targetChild.parent_id,
           title: title,
           message: message,
         });
@@ -261,7 +300,7 @@ const DriverDashboard = ({ navigation }) => {
       students.forEach((student) => {
         if (!student.isAbsent && student.status === "safe") {
           socket.emit("notify_parent", {
-            parentId: student.parent_id,
+            parentId: student.parent_id?._id || student.parent_id,
             title: "Driver is on the way! 🚐",
             message: `The school van has started its journey to pick up ${student.name}.`,
           });
@@ -280,7 +319,6 @@ const DriverDashboard = ({ navigation }) => {
     }
   };
 
-  // --- UPDATED: Broadcast Alert to show Driver info in the Title ---
   const sendBroadcastAlert = (message) => {
     Keyboard.dismiss();
     if (!message) {
@@ -288,7 +326,9 @@ const DriverDashboard = ({ navigation }) => {
       return;
     }
 
-    const uniqueParentIds = [...new Set(students.map((s) => s.parent_id))];
+    const uniqueParentIds = [
+      ...new Set(students.map((s) => s.parent_id?._id || s.parent_id)),
+    ];
 
     if (uniqueParentIds.length === 0) {
       Alert.alert("No Parents", "You don't have any students assigned yet.");
@@ -311,6 +351,15 @@ const DriverDashboard = ({ navigation }) => {
     setAlertModalVisible(false);
     setCustomAlertMsg("");
   };
+
+  // --- Calculate Occupancy Logic (Counts BOTH morning 'in-van' and evening 'returning') ---
+  const totalSeats = parseInt(vanDetails?.seats) || 0;
+  const expectedToday = students.filter((s) => !s.isAbsent).length;
+  const currentlyInVan = students.filter(
+    (s) => s.status === "in-van" || s.status === "returning",
+  ).length;
+  const fillPercentage =
+    totalSeats > 0 ? (currentlyInVan / totalSeats) * 100 : 0;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -378,56 +427,6 @@ const DriverDashboard = ({ navigation }) => {
           </View>
         </TouchableOpacity>
 
-        {/* Vehicle Info Card */}
-        <View className="bg-blue-900 p-4 rounded-2xl mb-6 flex-row justify-between items-center shadow-md">
-          <View>
-            <Text className="text-blue-200 text-xs uppercase font-bold">
-              Vehicle No
-            </Text>
-            <Text className="text-white text-xl font-bold">
-              {vanDetails?.vehicleNo || "N/A"}
-            </Text>
-          </View>
-          <View className="h-8 w-[1px] bg-blue-700 mx-2"></View>
-          <View>
-            <Text className="text-blue-200 text-xs uppercase font-bold">
-              Seats
-            </Text>
-            <Text className="text-white text-xl font-bold">
-              {vanDetails?.seats || "0"}
-            </Text>
-          </View>
-          <MaterialCommunityIcons
-            name="van-utility"
-            size={40}
-            color="white"
-            opacity={0.8}
-          />
-        </View>
-
-        {/* Financial / Payments Button */}
-        <TouchableOpacity
-          onPress={() => navigation.navigate("DriverPayments")}
-          className="bg-green-600 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-4"
-        >
-          <View className="flex-row items-center">
-            <MaterialIcons
-              name="account-balance-wallet"
-              size={28}
-              color="white"
-            />
-            <View className="ml-3">
-              <Text className="text-white font-bold text-lg">
-                Manage Payments
-              </Text>
-              <Text className="text-green-100 text-xs">
-                View bills & collect cash
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color="white" />
-        </TouchableOpacity>
-
         {/* Broadcast Emergency Alert Button */}
         <TouchableOpacity
           onPress={() => setAlertModalVisible(true)}
@@ -459,12 +458,80 @@ const DriverDashboard = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
 
+        {/* Financial / Payments Button */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate("DriverPayments")}
+          className="bg-green-600 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-6"
+        >
+          <View className="flex-row items-center">
+            <MaterialIcons
+              name="account-balance-wallet"
+              size={28}
+              color="white"
+            />
+            <View className="ml-3">
+              <Text className="text-white font-bold text-lg">
+                Manage Payments
+              </Text>
+              <Text className="text-green-100 text-xs">
+                View bills & collect cash
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="white" />
+        </TouchableOpacity>
+
+        {/* Occupancy Tracker UI */}
+        <View className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-lg font-bold text-gray-800">
+              Live Occupancy
+            </Text>
+            <View className="bg-blue-100 px-2 py-1 rounded-md">
+              <Text className="text-blue-700 font-bold text-xs">
+                {currentlyInVan} / {totalSeats} Seats Filled
+              </Text>
+            </View>
+          </View>
+
+          <View className="w-full h-3 bg-gray-200 rounded-full my-2 overflow-hidden">
+            <View
+              className={`h-full ${fillPercentage >= 100 ? "bg-red-500" : "bg-blue-600"}`}
+              style={{ width: `${Math.min(fillPercentage, 100)}%` }}
+            />
+          </View>
+
+          <View className="flex-row justify-between mt-2">
+            <Text className="text-gray-500 text-xs font-medium">
+              Expected Today:{" "}
+              <Text className="text-gray-800 font-bold">{expectedToday}</Text>
+            </Text>
+            <Text className="text-gray-500 text-xs font-medium">
+              Absent Today:{" "}
+              <Text className="text-red-500 font-bold">
+                {students.length - expectedToday}
+              </Text>
+            </Text>
+          </View>
+        </View>
+
         {/* Student List */}
         <Text className="text-lg font-bold text-gray-800 mb-4">
           Your Students
         </Text>
         {loading ? (
           <ActivityIndicator size="large" color="#2563EB" />
+        ) : students.length === 0 ? (
+          <View className="items-center py-6">
+            <MaterialCommunityIcons
+              name="account-group"
+              size={40}
+              color="#D1D5DB"
+            />
+            <Text className="text-gray-400 mt-2">
+              No students assigned yet.
+            </Text>
+          </View>
         ) : (
           students.map((child) => (
             <View
@@ -472,28 +539,42 @@ const DriverDashboard = ({ navigation }) => {
               className={`p-4 rounded-xl mb-3 flex-row justify-between items-center shadow-sm border-l-4 ${
                 child.isAbsent
                   ? "bg-red-50 border-red-500"
-                  : "bg-white border-blue-500"
+                  : child.status === "in-van" || child.status === "returning"
+                    ? "bg-blue-50 border-blue-600"
+                    : "bg-white border-gray-300"
               }`}
             >
-              <View className="flex-1">
+              <TouchableOpacity
+                className="flex-1"
+                onPress={() => {
+                  navigation.navigate("StudentDetails", { student: child });
+                }}
+              >
                 <View className="flex-row items-center mb-1">
                   <Text className="text-lg font-bold text-gray-800 mr-2">
                     {child.name}
                   </Text>
-                  {child.isAbsent && (
-                    <View className="bg-red-100 px-2 py-0.5 rounded-md border border-red-300">
-                      <Text className="text-red-700 font-bold text-xs">
-                        🔴 ABSENT
-                      </Text>
-                    </View>
-                  )}
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={16}
+                    color="#9CA3AF"
+                  />
                 </View>
-                <Text className="text-gray-500 text-xs">{child.school}</Text>
 
-                {!child.isAbsent ? (
+                <Text className="text-gray-500 text-xs mb-1">
+                  {child.school}
+                </Text>
+
+                {child.isAbsent ? (
+                  <View className="bg-red-100 px-2 py-1 rounded-md self-start">
+                    <Text className="text-red-700 font-bold text-xs">
+                      🔴 ABSENT
+                    </Text>
+                  </View>
+                ) : (
                   <View
-                    className={`px-2 py-1 rounded-md mt-2 self-start ${
-                      child.status === "in-van"
+                    className={`px-2 py-1 rounded-md self-start ${
+                      child.status === "in-van" || child.status === "returning"
                         ? "bg-yellow-100"
                         : child.status === "safe"
                           ? "bg-green-100"
@@ -502,30 +583,40 @@ const DriverDashboard = ({ navigation }) => {
                   >
                     <Text
                       className={`text-xs font-bold capitalize ${
-                        child.status === "in-van"
+                        child.status === "in-van" ||
+                        child.status === "returning"
                           ? "text-yellow-700"
                           : child.status === "safe"
                             ? "text-green-700"
                             : "text-gray-600"
                       }`}
                     >
-                      {child.status}
+                      {child.status === "in-van"
+                        ? "Going to School"
+                        : child.status === "returning"
+                          ? "Coming Home"
+                          : child.status}
                     </Text>
                   </View>
-                ) : (
-                  <Text className="text-red-500 text-xs font-medium mt-2">
-                    Will not attend today.
-                  </Text>
                 )}
-              </View>
+              </TouchableOpacity>
 
+              {/* Status Update Toggle Button */}
               {!child.isAbsent && (
                 <TouchableOpacity
-                  onPress={() => toggleStudentStatus(child._id, child.status)}
-                  className="bg-blue-100 p-3 rounded-full ml-2"
+                  onPress={() => confirmToggleStatus(child)}
+                  className={`p-3 rounded-full ml-2 shadow-sm ${
+                    child.status === "in-van" || child.status === "returning"
+                      ? "bg-white"
+                      : "bg-blue-100"
+                  }`}
                 >
                   <FontAwesome5
-                    name={child.status === "in-van" ? "walking" : "bus"}
+                    name={
+                      child.status === "in-van" || child.status === "returning"
+                        ? "walking"
+                        : "bus"
+                    }
                     size={20}
                     color="#2563EB"
                   />
