@@ -86,7 +86,7 @@ const EditChildScreen = ({ route, navigation }) => {
       if (response.status === 200) {
         Alert.alert("Success", "Child details updated!");
         // Navigate back to Dashboard safely
-        navigation.navigate("ParentDashboard");
+        navigation.goBack();
       }
     } catch (error) {
       console.log(error);
@@ -166,7 +166,7 @@ const EditChildScreen = ({ route, navigation }) => {
         />
 
         <TouchableOpacity
-          onPress={() => navigation.navigate("ParentDashboard")}
+          onPress={() => navigation.goBack()}
           className="mt-4 items-center mb-10"
         >
           <Text className="text-gray-500 font-bold">Cancel</Text>

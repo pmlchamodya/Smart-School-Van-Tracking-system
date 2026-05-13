@@ -53,17 +53,20 @@ app.use("/api/users", userRoutes);
 app.use("/api/children", childRoutes);
 app.use("/api/payments", paymentRoutes);
 
+// --- NEW: Object to store the last known locations of active vans in server memory ---
+const liveVanLocations = {};
+
 // Socket.io connection
 io.on("connection", (socket) => {
   console.log("New user connected", socket.id);
 
-  // --- NEW: Join a specific room based on User ID ---
+  // Join a specific room based on User ID
   socket.on("join", (userId) => {
     console.log(`User ${userId} joined their personal room`);
     socket.join(userId);
   });
 
-  // --- NEW: Listen for notifications from Driver and send to specific Parent ---
+  // Listen for notifications from Driver and send to specific Parent
   socket.on("notify_parent", async (data) => {
     try {
       console.log("1. Parent ID received from Frontend:", data.parentId);
@@ -93,22 +96,46 @@ io.on("connection", (socket) => {
     });
   });
 
+  // --- LOCATION TRACKING LOGIC ---
+
+  // 1. Receive location from driver and store it in memory
   socket.on("sendLocation", (data) => {
     console.log("Location received:", data);
+
+    // Store the latest location in the server's memory
+    liveVanLocations[data.driverId] = data;
+
+    // Broadcast to all listening parents
     io.emit(`receiveLocation_${data.driverId}`, data);
   });
+
+  // 2. Immediately send the last known location when a parent opens the map
+  socket.on("requestLastLocation", (driverId) => {
+    if (liveVanLocations[driverId]) {
+      console.log(
+        `Sending last known location to parent for driver ${driverId}`,
+      );
+      socket.emit(`receiveLocation_${driverId}`, liveVanLocations[driverId]);
+    }
+  });
+
+  // 3. Journey Ended Signal
+  socket.on("journeyEnded", (data) => {
+    console.log("Journey ended for driver:", data.driverId);
+
+    // Clear the location from memory since the journey is over
+    delete liveVanLocations[data.driverId];
+
+    // Notify the parent app that the journey has ended
+    io.emit(`journeyEnded_${data.driverId}`);
+  });
+
+  // --- END LOCATION TRACKING LOGIC ---
 
   // Attendance Update Signal
   socket.on("attendanceUpdated", (data) => {
     console.log("Attendance updated! Notifying driver:", data.driverId);
     io.emit(`refreshDriver_${data.driverId}`);
-  });
-
-  // Journey Ended Signal
-  socket.on("journeyEnded", (data) => {
-    console.log("Journey ended for driver:", data.driverId);
-    // Notify the parent app that the journey has ended
-    io.emit(`journeyEnded_${data.driverId}`);
   });
 
   // Listen for Payment Success Signals from Parents

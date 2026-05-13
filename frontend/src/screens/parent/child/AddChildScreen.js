@@ -92,7 +92,7 @@ const AddChildScreen = ({ route, navigation }) => {
       // If successful, show alert and go back
       if (response.status === 201) {
         Alert.alert("Success", "Child added successfully!");
-        navigation.navigate("ParentDashboard");
+        navigation.navigate("ParentTabs");
       }
     } catch (error) {
       console.log(error);
@@ -180,7 +180,7 @@ const AddChildScreen = ({ route, navigation }) => {
 
         {/* Cancel Button */}
         <TouchableOpacity
-          onPress={() => navigation.navigate("ParentDashboard")}
+          onPress={() => navigation.goBack()}
           className="mt-4 items-center mb-10"
         >
           <Text className="text-gray-500 font-bold">Cancel</Text>

@@ -11,11 +11,13 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from "expo-location"; // NEW: Imported expo-location
 import api from "../../services/api";
 import socket from "../../services/socket";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ParentMapScreen = ({ navigation }) => {
+  // Default map region (Colombo fallback)
   const [region, setRegion] = useState({
     latitude: 6.9271,
     longitude: 79.8612,
@@ -23,7 +25,7 @@ const ParentMapScreen = ({ navigation }) => {
     longitudeDelta: 0.05,
   });
 
-  // --- UPDATED: Group children by Driver ---
+  // Group children by Driver
   const [uniqueVans, setUniqueVans] = useState([]);
   const [activeVanIndex, setActiveVanIndex] = useState(0);
   const [vanLocations, setVanLocations] = useState({});
@@ -32,9 +34,38 @@ const ParentMapScreen = ({ navigation }) => {
   const mapRef = useRef(null);
 
   const activeVan = uniqueVans[activeVanIndex];
-  const activeDriverId = activeVan?.driverId;
+  const activeDriverId = activeVan ? String(activeVan.driverId).trim() : null;
 
-  // Step 1: Fetch All Children and Group by Driver
+  // --- NEW STEP: Get Parent's Current Location on Map Load ---
+  useEffect(() => {
+    const getUserLocation = async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          console.log("Permission to access location was denied");
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        // Center the map to Parent's current location initially
+        setRegion({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01, // Zoomed in closer
+        });
+      } catch (error) {
+        console.log("Error getting parent location:", error);
+      }
+    };
+
+    getUserLocation();
+  }, []);
+
+  // Step 1: Fetch All Children and Group by Driver ID safely
   useEffect(() => {
     const fetchChildrenDetails = async () => {
       try {
@@ -42,18 +73,26 @@ const ParentMapScreen = ({ navigation }) => {
         const childRes = await api.get(`/children/${userId}`);
         const children = childRes.data;
 
-        // Grouping Logic
         const vansMap = {};
         children.forEach((child) => {
           if (child.driver_id) {
-            // Only add if a driver is assigned
-            if (!vansMap[child.driver_id]) {
-              vansMap[child.driver_id] = {
-                driverId: child.driver_id,
-                childNames: [child.name],
-              };
+            // Ensure we extract the exact ID string whether it's an object or a string
+            let validDriverId = "";
+            if (typeof child.driver_id === "object" && child.driver_id._id) {
+              validDriverId = String(child.driver_id._id).trim();
             } else {
-              vansMap[child.driver_id].childNames.push(child.name);
+              validDriverId = String(child.driver_id).trim();
+            }
+
+            if (validDriverId) {
+              if (!vansMap[validDriverId]) {
+                vansMap[validDriverId] = {
+                  driverId: validDriverId,
+                  childNames: [child.name],
+                };
+              } else {
+                vansMap[validDriverId].childNames.push(child.name);
+              }
             }
           }
         });
@@ -61,6 +100,10 @@ const ParentMapScreen = ({ navigation }) => {
         const vansArray = Object.values(vansMap);
 
         if (vansArray.length > 0) {
+          console.log(
+            "✅ Parent is assigned to Driver IDs: ",
+            vansArray.map((v) => v.driverId),
+          );
           setUniqueVans(vansArray);
         } else {
           setLoading(false);
@@ -78,14 +121,25 @@ const ParentMapScreen = ({ navigation }) => {
     fetchChildrenDetails();
   }, []);
 
-  // Step 2: Setup Socket Listeners for unique drivers
+  // Step 2: Setup Socket Listeners
   useEffect(() => {
     if (uniqueVans.length === 0) return;
 
     uniqueVans.forEach((van) => {
       const safeDriverId = String(van.driverId).trim();
+      const socketEventName = `receiveLocation_${safeDriverId}`;
 
-      socket.on(`receiveLocation_${safeDriverId}`, (data) => {
+      console.log(
+        `📡 Listening for live location on event: ${socketEventName}`,
+      );
+
+      // Request the last known location from the server immediately upon opening the map
+      socket.emit("requestLastLocation", safeDriverId);
+
+      // Listen for incoming live location updates
+      socket.on(socketEventName, (data) => {
+        console.log(`📍 LIVE LOCATION RECEIVED IN PARENT APP!`, data);
+
         setVanLocations((prev) => ({
           ...prev,
           [safeDriverId]: {
@@ -96,7 +150,9 @@ const ParentMapScreen = ({ navigation }) => {
         setLoading(false);
       });
 
+      // Listen for journey completion
       socket.on(`journeyEnded_${safeDriverId}`, () => {
+        console.log(`🛑 Journey Ended for driver ${safeDriverId}`);
         setVanLocations((prev) => ({
           ...prev,
           [safeDriverId]: null,
@@ -104,6 +160,7 @@ const ParentMapScreen = ({ navigation }) => {
       });
     });
 
+    // Cleanup function to avoid memory leaks
     return () => {
       uniqueVans.forEach((van) => {
         const safeDriverId = String(van.driverId).trim();
@@ -113,7 +170,7 @@ const ParentMapScreen = ({ navigation }) => {
     };
   }, [uniqueVans]);
 
-  // Step 3: Animate Camera smoothly
+  // Step 3: Animate Camera smoothly when Driver Location comes in
   useEffect(() => {
     if (activeDriverId && vanLocations[activeDriverId] && mapRef.current) {
       mapRef.current.animateToRegion(
@@ -122,11 +179,12 @@ const ParentMapScreen = ({ navigation }) => {
           latitudeDelta: 0.005,
           longitudeDelta: 0.005,
         },
-        1000, // 1-second smooth glide
+        1000,
       );
     }
   }, [activeVanIndex, vanLocations, activeDriverId]);
 
+  // Determine current status message
   let currentStatus = "Loading...";
   if (!activeDriverId) {
     currentStatus = "No Driver Assigned";
@@ -138,7 +196,6 @@ const ParentMapScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Show Tabs ONLY if there are multiple unique vans */}
       {uniqueVans.length > 1 && (
         <View style={styles.tabContainer}>
           <ScrollView
@@ -177,7 +234,7 @@ const ParentMapScreen = ({ navigation }) => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        initialRegion={region}
+        region={region}
         showsUserLocation={true}
       >
         {activeDriverId && vanLocations[activeDriverId] && (
@@ -206,7 +263,6 @@ const ParentMapScreen = ({ navigation }) => {
 
       <View style={styles.infoBox}>
         <Text style={styles.statusText}>Status: {currentStatus}</Text>
-
         {loading && activeDriverId && !vanLocations[activeDriverId] && (
           <View
             style={{ flexDirection: "row", marginTop: 8, alignItems: "center" }}
@@ -240,22 +296,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
   },
-  activeTab: {
-    backgroundColor: "#2563EB",
-  },
-  inactiveTab: {
-    backgroundColor: "white",
-  },
-  tabText: {
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  activeTabText: {
-    color: "white",
-  },
-  inactiveTabText: {
-    color: "#4B5563",
-  },
+  activeTab: { backgroundColor: "#2563EB" },
+  inactiveTab: { backgroundColor: "white" },
+  tabText: { fontWeight: "bold", fontSize: 14 },
+  activeTabText: { color: "white" },
+  inactiveTabText: { color: "#4B5563" },
   backButton: {
     position: "absolute",
     top: 50,
@@ -282,16 +327,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
-  statusText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1F2937",
-  },
-  timeText: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginLeft: 5,
-  },
+  statusText: { fontSize: 16, fontWeight: "bold", color: "#1F2937" },
+  timeText: { fontSize: 14, color: "#6B7280", marginLeft: 5 },
 });
 
 export default ParentMapScreen;

@@ -69,7 +69,7 @@ const FindDriverScreen = ({ route, navigation }) => {
               });
 
               Alert.alert("Success", "Driver assigned successfully!");
-              navigation.navigate("ParentDashboard");
+              navigation.navigate("ParentTabs");
             } catch (error) {
               Alert.alert("Error", "Failed to assign driver.");
             }

@@ -1,6 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
+const sendEmail = require("../utils/sendEmail");
 
 // Generate JWT Token using the secret from .env
 const generateToken = (id) => {
@@ -155,35 +155,26 @@ const sendOTP = async (req, res) => {
     user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    // Configure Nodemailer transporter using environment variables
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+    // Email content with OTP code
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px; max-width: 500px;">
+        <h2 style="color: #2563EB; text-align: center;">Verification Code</h2>
+        <p>Hello ${user.name},</p>
+        <p>You requested to reset your password. Use the following OTP to verify your account:</p>
+        <div style="background: #f3f4f6; padding: 15px; text-align: center; border-radius: 5px;">
+          <h1 style="letter-spacing: 10px; color: #1e40af; margin: 0;">${otp}</h1>
+        </div>
+        <p style="margin-top: 15px; color: #666;">This code is valid for 10 minutes only. If you did not request this, please ignore this email.</p>
+      </div>
+    `;
+
+    // Send the OTP email using the sendEmail utility
+    await sendEmail({
+      email: email,
+      subject: "Password Reset Verification Code",
+      html: emailHtml,
     });
 
-    // Email content with OTP code
-    const mailOptions = {
-      from: `"Smart School Van Support" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Password Reset Verification Code",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px; max-width: 500px;">
-          <h2 style="color: #2563EB; text-align: center;">Verification Code</h2>
-          <p>Hello ${user.name},</p>
-          <p>You requested to reset your password. Use the following OTP to verify your account:</p>
-          <div style="background: #f3f4f6; padding: 15px; text-align: center; border-radius: 5px;">
-            <h1 style="letter-spacing: 10px; color: #1e40af; margin: 0;">${otp}</h1>
-          </div>
-          <p style="margin-top: 15px; color: #666;">This code is valid for 10 minutes only. If you did not request this, please ignore this email.</p>
-        </div>
-      `,
-    };
-
-    // Send the email
-    await transporter.sendMail(mailOptions);
     res.status(200).json({ message: "OTP sent successfully to your email" });
   } catch (error) {
     console.error("Send OTP Error:", error);

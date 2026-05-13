@@ -12,7 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useFocusEffect } from "@react-navigation/native";
-import socket from "../../services/socket"; // Import centralized socket
+import socket from "../../services/socket";
 
 const DriverPaymentScreen = ({ navigation }) => {
   const [payments, setPayments] = useState([]);
