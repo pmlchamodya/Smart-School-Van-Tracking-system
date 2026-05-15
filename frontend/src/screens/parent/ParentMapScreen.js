@@ -8,10 +8,10 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE, Polyline } from "react-native-maps"; // Imported Polyline
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Location from "expo-location"; // NEW: Imported expo-location
+import * as Location from "expo-location";
 import api from "../../services/api";
 import socket from "../../services/socket";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,13 +30,18 @@ const ParentMapScreen = ({ navigation }) => {
   const [activeVanIndex, setActiveVanIndex] = useState(0);
   const [vanLocations, setVanLocations] = useState({});
 
+  // States for routing
+  const [userLocation, setUserLocation] = useState(null);
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [isRouting, setIsRouting] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
 
   const activeVan = uniqueVans[activeVanIndex];
   const activeDriverId = activeVan ? String(activeVan.driverId).trim() : null;
 
-  // --- NEW STEP: Get Parent's Current Location on Map Load ---
+  // Step 1: Get Parent's Current Location on Map Load
   useEffect(() => {
     const getUserLocation = async () => {
       try {
@@ -50,12 +55,15 @@ const ParentMapScreen = ({ navigation }) => {
           accuracy: Location.Accuracy.Balanced,
         });
 
+        // Save parent location for routing
+        setUserLocation(location.coords);
+
         // Center the map to Parent's current location initially
         setRegion({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           latitudeDelta: 0.01,
-          longitudeDelta: 0.01, // Zoomed in closer
+          longitudeDelta: 0.01,
         });
       } catch (error) {
         console.log("Error getting parent location:", error);
@@ -65,7 +73,7 @@ const ParentMapScreen = ({ navigation }) => {
     getUserLocation();
   }, []);
 
-  // Step 1: Fetch All Children and Group by Driver ID safely
+  // Step 2: Fetch All Children and Group by Driver ID safely
   useEffect(() => {
     const fetchChildrenDetails = async () => {
       try {
@@ -100,10 +108,6 @@ const ParentMapScreen = ({ navigation }) => {
         const vansArray = Object.values(vansMap);
 
         if (vansArray.length > 0) {
-          console.log(
-            "✅ Parent is assigned to Driver IDs: ",
-            vansArray.map((v) => v.driverId),
-          );
           setUniqueVans(vansArray);
         } else {
           setLoading(false);
@@ -121,7 +125,7 @@ const ParentMapScreen = ({ navigation }) => {
     fetchChildrenDetails();
   }, []);
 
-  // Step 2: Setup Socket Listeners
+  // Step 3: Setup Socket Listeners
   useEffect(() => {
     if (uniqueVans.length === 0) return;
 
@@ -129,17 +133,11 @@ const ParentMapScreen = ({ navigation }) => {
       const safeDriverId = String(van.driverId).trim();
       const socketEventName = `receiveLocation_${safeDriverId}`;
 
-      console.log(
-        `📡 Listening for live location on event: ${socketEventName}`,
-      );
-
       // Request the last known location from the server immediately upon opening the map
       socket.emit("requestLastLocation", safeDriverId);
 
       // Listen for incoming live location updates
       socket.on(socketEventName, (data) => {
-        console.log(`📍 LIVE LOCATION RECEIVED IN PARENT APP!`, data);
-
         setVanLocations((prev) => ({
           ...prev,
           [safeDriverId]: {
@@ -152,11 +150,11 @@ const ParentMapScreen = ({ navigation }) => {
 
       // Listen for journey completion
       socket.on(`journeyEnded_${safeDriverId}`, () => {
-        console.log(`🛑 Journey Ended for driver ${safeDriverId}`);
         setVanLocations((prev) => ({
           ...prev,
           [safeDriverId]: null,
         }));
+        setRouteCoords([]); // Clear route when journey ends
       });
     });
 
@@ -170,19 +168,61 @@ const ParentMapScreen = ({ navigation }) => {
     };
   }, [uniqueVans]);
 
-  // Step 3: Animate Camera smoothly when Driver Location comes in
+  // Step 4: Fetch Route from OSRM API (Just like DriverMapScreen)
+  useEffect(() => {
+    if (activeDriverId && vanLocations[activeDriverId] && userLocation) {
+      const fetchRoute = async () => {
+        setIsRouting(true);
+        try {
+          const startLoc = `${vanLocations[activeDriverId].longitude},${vanLocations[activeDriverId].latitude}`;
+          const endLoc = `${userLocation.longitude},${userLocation.latitude}`;
+
+          const response = await fetch(
+            `https://router.project-osrm.org/route/v1/driving/${startLoc};${endLoc}?geometries=geojson`,
+          );
+          const data = await response.json();
+
+          if (data.routes && data.routes.length > 0) {
+            const coordinates = data.routes[0].geometry.coordinates.map(
+              (coord) => ({
+                latitude: coord[1],
+                longitude: coord[0],
+              }),
+            );
+            setRouteCoords(coordinates);
+          }
+        } catch (error) {
+          console.error("Failed to fetch route:", error);
+        } finally {
+          setIsRouting(false);
+        }
+      };
+
+      // Fetch route every time the van moves
+      fetchRoute();
+    } else {
+      setRouteCoords([]);
+    }
+  }, [activeVanIndex, vanLocations, activeDriverId, userLocation]);
+
+  // Step 5: Animate Camera smoothly when Driver Location comes in
   useEffect(() => {
     if (activeDriverId && vanLocations[activeDriverId] && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          ...vanLocations[activeDriverId],
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        },
-        1000,
-      );
+      // Small delay to allow the polyline to render before zooming
+      setTimeout(() => {
+        if (mapRef.current && userLocation) {
+          // Fit map to show BOTH the Van and the Parent
+          mapRef.current.fitToCoordinates(
+            [vanLocations[activeDriverId], userLocation],
+            {
+              edgePadding: { top: 100, right: 50, bottom: 150, left: 50 },
+              animated: true,
+            },
+          );
+        }
+      }, 500);
     }
-  }, [activeVanIndex, vanLocations, activeDriverId]);
+  }, [activeVanIndex, vanLocations, activeDriverId, userLocation]);
 
   // Determine current status message
   let currentStatus = "Loading...";
@@ -234,9 +274,11 @@ const ParentMapScreen = ({ navigation }) => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        region={region}
+        initialRegion={region}
         showsUserLocation={true}
+        showsMyLocationButton={false}
       >
+        {/* Render Van Marker */}
         {activeDriverId && vanLocations[activeDriverId] && (
           <Marker
             coordinate={vanLocations[activeDriverId]}
@@ -252,6 +294,16 @@ const ParentMapScreen = ({ navigation }) => {
             </View>
           </Marker>
         )}
+
+        {/* Render the Route Polyline from OSRM */}
+        {routeCoords.length > 0 && (
+          <Polyline
+            coordinates={routeCoords}
+            strokeWidth={5}
+            strokeColor="#2563EB"
+            lineJoin="round"
+          />
+        )}
       </MapView>
 
       <TouchableOpacity
@@ -263,6 +315,17 @@ const ParentMapScreen = ({ navigation }) => {
 
       <View style={styles.infoBox}>
         <Text style={styles.statusText}>Status: {currentStatus}</Text>
+
+        {/* Show Route Loading Indicator */}
+        {isRouting && (
+          <View
+            style={{ flexDirection: "row", marginTop: 4, alignItems: "center" }}
+          >
+            <ActivityIndicator size="small" color="#2563EB" />
+            <Text style={styles.timeText}> Drawing route...</Text>
+          </View>
+        )}
+
         {loading && activeDriverId && !vanLocations[activeDriverId] && (
           <View
             style={{ flexDirection: "row", marginTop: 8, alignItems: "center" }}

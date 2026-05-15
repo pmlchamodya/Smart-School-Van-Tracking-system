@@ -21,8 +21,6 @@ import {
   FontAwesome5,
 } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-// --- NEW: Import API and Socket to handle the "Get In" action from the Map ---
 import api from "../../services/api";
 import socket from "../../services/socket";
 
