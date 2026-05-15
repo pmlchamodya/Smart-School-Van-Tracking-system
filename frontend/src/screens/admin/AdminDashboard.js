@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import api from "../../services/api"; // Import your API instance
+import api from "../../services/api";
 
 const AdminDashboard = ({ navigation }) => {
   const [adminName, setAdminName] = useState("");
@@ -56,7 +56,7 @@ const AdminDashboard = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <ScrollView className="p-5">
         {/* --- Header Section --- */}
         <View className="flex-row justify-between items-center mb-8">

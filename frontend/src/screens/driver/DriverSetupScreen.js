@@ -91,7 +91,7 @@ const DriverSetupScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white p-5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View className="flex-row items-center mb-2">

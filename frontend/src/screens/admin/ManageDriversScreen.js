@@ -222,7 +222,7 @@ const ManageDriversScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 p-5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       {/* Header */}
       <View className="flex-row items-center mb-6">
         <TouchableOpacity onPress={() => navigation.goBack()} className="mr-3">

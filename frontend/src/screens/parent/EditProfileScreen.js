@@ -132,7 +132,7 @@ const EditProfileScreen = ({ navigation }) => {
             setShowImageModal(false);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -145,7 +145,7 @@ const EditProfileScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <ScrollView className="p-5" showsVerticalScrollIndicator={false}>
         {/* --- Profile Photo Section --- */}
         <View className="items-center mb-6">

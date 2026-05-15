@@ -71,7 +71,7 @@ const EditDriverProfileScreen = ({ navigation }) => {
           if (user.vanDetails) {
             setVehicleNo(user.vanDetails.vehicleNo || "");
             setSeats(
-              user.vanDetails.seats ? user.vanDetails.seats.toString() : ""
+              user.vanDetails.seats ? user.vanDetails.seats.toString() : "",
             );
             setModel(user.vanDetails.model || "");
           }
@@ -83,12 +83,12 @@ const EditDriverProfileScreen = ({ navigation }) => {
             setSchools(
               user.routeDetails.schools
                 ? user.routeDetails.schools.join(", ")
-                : ""
+                : "",
             );
             setCities(
               user.routeDetails.cities
                 ? user.routeDetails.cities.join(", ")
-                : ""
+                : "",
             );
           }
         }
@@ -170,7 +170,7 @@ const EditDriverProfileScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <ScrollView className="p-5" showsVerticalScrollIndicator={false}>
         {/* Profile Image Section */}
         <View className="items-center mb-6 mt-4">

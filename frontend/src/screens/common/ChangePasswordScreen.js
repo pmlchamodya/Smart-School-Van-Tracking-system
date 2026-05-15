@@ -55,7 +55,7 @@ const ChangePasswordScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white p-5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text className="text-2xl font-bold text-gray-800 mb-2">
           Change Password

@@ -170,7 +170,7 @@ const FindDriverScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 p-5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       {/* Header Section */}
       <View className="flex-row items-center mb-6">
         <TouchableOpacity

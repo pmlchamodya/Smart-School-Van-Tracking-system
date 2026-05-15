@@ -15,7 +15,7 @@ const StudentDetailsScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       {/* Header */}
       <View className="flex-row items-center p-5 bg-blue-600 rounded-b-3xl shadow-md">
         <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">

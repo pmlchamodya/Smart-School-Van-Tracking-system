@@ -11,7 +11,7 @@ const PasswordInput = ({ placeholder, value, onChangeText }) => {
       <TextInput
         className="flex-1 ml-2 text-gray-800"
         placeholder={placeholder || "Enter password"}
-        secureTextEntry={!isPasswordVisible} // ඇස ඔබනකොට මේක මාරු වෙනවා
+        secureTextEntry={!isPasswordVisible}
         value={value}
         onChangeText={onChangeText}
       />

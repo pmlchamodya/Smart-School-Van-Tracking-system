@@ -134,7 +134,7 @@ const DriverPaymentScreen = ({ navigation }) => {
     .reduce((sum, p) => sum + p.amount, 0);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         {/* Header */}
         <View className="flex-row items-center p-5 bg-blue-600 rounded-b-3xl shadow-md">

@@ -11,6 +11,7 @@ import {
   TextInput,
   Keyboard,
   Linking,
+  StyleSheet,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
@@ -26,18 +27,39 @@ import api from "../../services/api";
 import socket from "../../services/socket";
 import { useFocusEffect } from "@react-navigation/native";
 
+// ─── Color Tokens ─────────────────────────────────────────────────────────────
+const C = {
+  navy: "#0F2D5A",
+  blue: "#1A4FA0",
+  blueMid: "#2563EB",
+  blueLight: "#EBF2FF",
+  amber: "#F59E0B",
+  amberLight: "#FEF9EC",
+  green: "#16A34A",
+  greenLight: "#F0FDF4",
+  red: "#DC2626",
+  redLight: "#FEF2F2",
+  orange: "#EA580C",
+  gray50: "#F8FAFC",
+  gray100: "#F1F5F9",
+  gray200: "#E2E8F0",
+  gray400: "#94A3B8",
+  gray600: "#475569",
+  gray800: "#1E293B",
+  white: "#FFFFFF",
+};
+
+// ─── Distance Helper ──────────────────────────────────────────────────────────
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3;
   const p1 = (lat1 * Math.PI) / 180;
   const p2 = (lat2 * Math.PI) / 180;
   const dp = ((lat2 - lat1) * Math.PI) / 180;
   const dl = ((lon2 - lon1) * Math.PI) / 180;
-
   const a =
     Math.sin(dp / 2) * Math.sin(dp / 2) +
     Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
   return Math.floor(R * c);
 };
 
@@ -51,10 +73,8 @@ const DriverDashboard = ({ navigation }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notifiedStudents, setNotifiedStudents] = useState({});
-
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [customAlertMsg, setCustomAlertMsg] = useState("");
-
   const [region, setRegion] = useState({
     latitude: 6.9271,
     longitude: 79.8612,
@@ -72,11 +92,9 @@ const DriverDashboard = ({ navigation }) => {
         );
         return;
       }
-
       let location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-
       setRegion({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -90,7 +108,6 @@ const DriverDashboard = ({ navigation }) => {
 
   useEffect(() => {
     let locationSubscription;
-
     const startTracking = async () => {
       if (isJourneyStarted && driverId) {
         locationSubscription = await Location.watchPositionAsync(
@@ -111,13 +128,11 @@ const DriverDashboard = ({ navigation }) => {
         );
       }
     };
-
     if (isJourneyStarted) {
       startTracking();
     } else {
       if (locationSubscription) locationSubscription.remove();
     }
-
     return () => {
       if (locationSubscription) locationSubscription.remove();
     };
@@ -137,7 +152,6 @@ const DriverDashboard = ({ navigation }) => {
             student.location.latitude,
             student.location.longitude,
           );
-
           if (distanceInMeters <= 1000 && !notifiedStudents[student._id]) {
             socket.emit("notify_parent", {
               parentId: student.parent_id?._id || student.parent_id,
@@ -155,12 +169,10 @@ const DriverDashboard = ({ navigation }) => {
     try {
       setLoading(true);
       const id = await AsyncStorage.getItem("userId");
-
       if (id) {
         setDriverId(id);
         const userRes = await api.get(`/users/profile/${id}`);
         const user = userRes.data;
-
         if (user) {
           if (!user.vanDetails || !user.vanDetails.vehicleNo) {
             navigation.replace("DriverSetup");
@@ -171,7 +183,6 @@ const DriverDashboard = ({ navigation }) => {
           setMobile(user.phoneNumber);
           setVanDetails(user.vanDetails || {});
         }
-
         const childRes = await api.get(`/children/driver/${id}`);
         setStudents(childRes.data);
       }
@@ -200,7 +211,7 @@ const DriverDashboard = ({ navigation }) => {
     };
   }, [driverId]);
 
-  // --- NEW: 4-Step Status Logic (safe -> in-van -> school -> returning -> safe) ---
+  // --- 4-Step Status Logic ---
   const confirmToggleStatus = (child) => {
     let newStatus =
       child.status === "safe"
@@ -352,7 +363,7 @@ const DriverDashboard = ({ navigation }) => {
     setCustomAlertMsg("");
   };
 
-  // --- Calculate Occupancy Logic (Counts BOTH morning 'in-van' and evening 'returning') ---
+  // Occupancy calculations
   const totalSeats = parseInt(vanDetails?.seats) || 0;
   const expectedToday = students.filter((s) => !s.isAbsent).length;
   const currentlyInVan = students.filter(
@@ -361,274 +372,338 @@ const DriverDashboard = ({ navigation }) => {
   const fillPercentage =
     totalSeats > 0 ? (currentlyInVan / totalSeats) * 100 : 0;
 
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView className="p-5">
-        {/* Header Section */}
-        <View className="flex-row justify-between items-start mb-4">
-          <View>
-            <Text className="text-gray-500 font-medium text-sm">
-              Hello Driver,
-            </Text>
-            <Text className="text-2xl font-bold text-gray-800">
-              {driverName}
-            </Text>
-            <Text className="text-gray-500 text-xs mt-1">
-              <Ionicons name="call" size={12} /> {mobile || "No Mobile"}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate("DriverProfile")}
-            className="w-14 h-14 bg-gray-200 rounded-full overflow-hidden border-2 border-white shadow-sm"
-          >
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} className="w-full h-full" />
-            ) : (
-              <View className="w-full h-full items-center justify-center bg-green-600">
-                <Text className="text-white text-xl font-bold">D</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            {/* Info */}
+            <View style={styles.driverInfoBlock}>
+              <Text style={styles.greetingLabel}>Hello Driver,</Text>
+              <Text style={styles.driverName}>{driverName}</Text>
+              <View style={styles.mobileRow}>
+                <Ionicons name="call-outline" size={12} color={C.gray400} />
+                <Text style={styles.mobileText}>{mobile || "No Mobile"}</Text>
               </View>
-            )}
-          </TouchableOpacity>
+            </View>
+
+            {/* Avatar */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("DriverProfile")}
+              style={styles.avatarWrapper}
+            >
+              {profileImage ? (
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.avatarImage, styles.avatarFallback]}>
+                  <Text style={styles.avatarInitial}>D</Text>
+                </View>
+              )}
+              <View style={styles.onlineDot} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Van badge */}
+          {vanDetails?.vehicleNo && (
+            <View style={styles.vanBadge}>
+              <MaterialCommunityIcons
+                name="van-passenger"
+                size={14}
+                color={C.amber}
+              />
+              <Text style={styles.vanBadgeText}>
+                Van: {vanDetails.vehicleNo}
+              </Text>
+              {vanDetails?.seats && <Text style={styles.vanBadgeSep}> · </Text>}
+              {vanDetails?.seats && (
+                <Text style={styles.vanBadgeText}>
+                  {vanDetails.seats} Seats
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
-        {/* LIVE MAP SECTION */}
-        <Text className="text-gray-800 font-bold mb-3 text-lg">
-          Live Location
-        </Text>
+        {/* ── Live Location Map ── */}
+        <Text style={styles.sectionLabel}>Live Location</Text>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => {
+          onPress={() =>
             navigation.navigate("DriverMap", {
               initialRegion: region,
               students: students,
-            });
-          }}
-          className="h-56 w-full rounded-3xl overflow-hidden mb-6 shadow-md border border-gray-200 bg-gray-200"
+            })
+          }
+          style={styles.mapWrapper}
         >
           <MapView
-            style={{ width: "100%", height: "100%" }}
+            style={styles.map}
             region={region}
             scrollEnabled={false}
             zoomEnabled={false}
             showsUserLocation={true}
           >
             <Marker coordinate={region} title="My Current Location">
-              <View className="bg-blue-600 p-2 rounded-full border-2 border-white">
+              <View style={styles.mapMarker}>
                 <MaterialCommunityIcons
                   name="van-passenger"
                   size={20}
-                  color="white"
+                  color={C.white}
                 />
               </View>
             </Marker>
           </MapView>
-          <View className="absolute bottom-2 right-2 bg-black/50 px-2 py-1 rounded-lg">
-            <Text className="text-white text-[10px]">Tap to Expand</Text>
+          <View style={styles.mapExpandHint}>
+            <Ionicons name="expand-outline" size={12} color={C.white} />
+            <Text style={styles.mapExpandText}> Tap to Expand</Text>
           </View>
         </TouchableOpacity>
 
-        {/* Broadcast Emergency Alert Button */}
+        {/* ── Broadcast Alert Button ── */}
         <TouchableOpacity
           onPress={() => setAlertModalVisible(true)}
-          className="bg-red-50 border border-red-200 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-6"
+          style={styles.broadcastBtn}
+          activeOpacity={0.88}
         >
-          <View className="flex-row items-center">
-            <Ionicons name="warning" size={28} color="#EF4444" />
-            <View className="ml-3">
-              <Text className="text-red-600 font-bold text-lg">
-                Broadcast Alert
-              </Text>
-              <Text className="text-red-400 text-xs">
-                Send urgent message to all parents
-              </Text>
-            </View>
+          <View style={styles.broadcastIconBox}>
+            <Ionicons name="warning" size={24} color={C.red} />
           </View>
-          <MaterialCommunityIcons name="broadcast" size={24} color="#EF4444" />
+          <View style={styles.broadcastTextBox}>
+            <Text style={styles.broadcastTitle}>Broadcast Alert</Text>
+            <Text style={styles.broadcastSub}>
+              Send urgent message to all parents
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="broadcast" size={22} color={C.red} />
         </TouchableOpacity>
 
-        {/* Journey Control Button */}
+        {/* ── Journey Control Button ── */}
         <TouchableOpacity
           onPress={toggleJourney}
-          className={`p-4 rounded-2xl shadow-sm items-center mb-6 ${
-            isJourneyStarted ? "bg-red-500" : "bg-blue-600"
-          }`}
+          style={[
+            styles.journeyBtn,
+            isJourneyStarted ? styles.journeyBtnEnd : styles.journeyBtnStart,
+          ]}
+          activeOpacity={0.88}
         >
-          <Text className="text-white font-bold text-xl">
+          <Ionicons
+            name={
+              isJourneyStarted ? "stop-circle-outline" : "play-circle-outline"
+            }
+            size={26}
+            color={C.white}
+            style={{ marginRight: 10 }}
+          />
+          <Text style={styles.journeyBtnText}>
             {isJourneyStarted ? "END JOURNEY" : "START JOURNEY"}
           </Text>
         </TouchableOpacity>
 
-        {/* Financial / Payments Button */}
+        {/* ── Payments Button ── */}
         <TouchableOpacity
           onPress={() => navigation.navigate("DriverPayments")}
-          className="bg-green-600 p-4 rounded-2xl shadow-sm flex-row items-center justify-between mb-6"
+          style={styles.paymentsBtn}
+          activeOpacity={0.88}
         >
-          <View className="flex-row items-center">
+          <View style={styles.paymentsBtnIconBox}>
             <MaterialIcons
               name="account-balance-wallet"
-              size={28}
-              color="white"
+              size={26}
+              color={C.white}
             />
-            <View className="ml-3">
-              <Text className="text-white font-bold text-lg">
-                Manage Payments
-              </Text>
-              <Text className="text-green-100 text-xs">
-                View bills & collect cash
-              </Text>
-            </View>
           </View>
-          <Ionicons name="chevron-forward" size={24} color="white" />
+          <View style={styles.paymentsBtnTextBox}>
+            <Text style={styles.paymentsBtnTitle}>Manage Payments</Text>
+            <Text style={styles.paymentsBtnSub}>View bills & collect cash</Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={22}
+            color="rgba(255,255,255,0.7)"
+          />
         </TouchableOpacity>
 
-        {/* Occupancy Tracker UI */}
-        <View className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-lg font-bold text-gray-800">
-              Live Occupancy
-            </Text>
-            <View className="bg-blue-100 px-2 py-1 rounded-md">
-              <Text className="text-blue-700 font-bold text-xs">
-                {currentlyInVan} / {totalSeats} Seats Filled
+        {/* ── Occupancy Tracker ── */}
+        <View style={styles.occupancyCard}>
+          <View style={styles.occupancyHeader}>
+            <Text style={styles.occupancyTitle}>Live Occupancy</Text>
+            <View style={styles.occupancyBadge}>
+              <Text style={styles.occupancyBadgeText}>
+                {currentlyInVan} / {totalSeats} Seats
               </Text>
             </View>
           </View>
 
-          <View className="w-full h-3 bg-gray-200 rounded-full my-2 overflow-hidden">
+          {/* Progress bar */}
+          <View style={styles.progressTrack}>
             <View
-              className={`h-full ${fillPercentage >= 100 ? "bg-red-500" : "bg-blue-600"}`}
-              style={{ width: `${Math.min(fillPercentage, 100)}%` }}
+              style={[
+                styles.progressFill,
+                {
+                  width: `${Math.min(fillPercentage, 100)}%`,
+                  backgroundColor: fillPercentage >= 100 ? C.red : C.amber,
+                },
+              ]}
             />
           </View>
 
-          <View className="flex-row justify-between mt-2">
-            <Text className="text-gray-500 text-xs font-medium">
+          <View style={styles.occupancyFooter}>
+            <Text style={styles.occupancyFooterText}>
               Expected Today:{" "}
-              <Text className="text-gray-800 font-bold">{expectedToday}</Text>
+              <Text style={styles.occupancyFooterBold}>{expectedToday}</Text>
             </Text>
-            <Text className="text-gray-500 text-xs font-medium">
+            <Text style={styles.occupancyFooterText}>
               Absent Today:{" "}
-              <Text className="text-red-500 font-bold">
+              <Text style={[styles.occupancyFooterBold, { color: C.red }]}>
                 {students.length - expectedToday}
               </Text>
             </Text>
           </View>
         </View>
 
-        {/* Student List */}
-        <Text className="text-lg font-bold text-gray-800 mb-4">
-          Your Students
-        </Text>
+        {/* ── Students List ── */}
+        <Text style={styles.sectionLabel}>Your Students</Text>
+
         {loading ? (
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator
+            size="large"
+            color={C.blueMid}
+            style={{ marginTop: 20 }}
+          />
         ) : students.length === 0 ? (
-          <View className="items-center py-6">
+          <View style={styles.emptyCard}>
             <MaterialCommunityIcons
               name="account-group"
-              size={40}
-              color="#D1D5DB"
+              size={44}
+              color={C.gray200}
             />
-            <Text className="text-gray-400 mt-2">
-              No students assigned yet.
-            </Text>
+            <Text style={styles.emptyText}>No students assigned yet.</Text>
           </View>
         ) : (
-          students.map((child) => (
-            <View
-              key={child._id}
-              className={`p-4 rounded-xl mb-3 flex-row justify-between items-center shadow-sm border-l-4 ${
-                child.isAbsent
-                  ? "bg-red-50 border-red-500"
-                  : child.status === "in-van" || child.status === "returning"
-                    ? "bg-blue-50 border-blue-600"
-                    : "bg-white border-gray-300"
-              }`}
-            >
-              <TouchableOpacity
-                className="flex-1"
-                onPress={() => {
-                  navigation.navigate("StudentDetails", { student: child });
-                }}
+          students.map((child) => {
+            const isInVan =
+              child.status === "in-van" || child.status === "returning";
+
+            // Card accent color
+            const accentColor = child.isAbsent
+              ? C.red
+              : isInVan
+                ? C.amber
+                : C.green;
+
+            return (
+              <View
+                key={child._id}
+                style={[
+                  styles.studentCard,
+                  child.isAbsent
+                    ? styles.studentCardAbsent
+                    : isInVan
+                      ? styles.studentCardInVan
+                      : styles.studentCardDefault,
+                ]}
               >
-                <View className="flex-row items-center mb-1">
-                  <Text className="text-lg font-bold text-gray-800 mr-2">
-                    {child.name}
-                  </Text>
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={16}
-                    color="#9CA3AF"
-                  />
-                </View>
+                {/* Accent bar */}
+                <View
+                  style={[
+                    styles.studentCardAccent,
+                    { backgroundColor: accentColor },
+                  ]}
+                />
 
-                <Text className="text-gray-500 text-xs mb-1">
-                  {child.school}
-                </Text>
-
-                {child.isAbsent ? (
-                  <View className="bg-red-100 px-2 py-1 rounded-md self-start">
-                    <Text className="text-red-700 font-bold text-xs">
-                      🔴 ABSENT
-                    </Text>
-                  </View>
-                ) : (
-                  <View
-                    className={`px-2 py-1 rounded-md self-start ${
-                      child.status === "in-van" || child.status === "returning"
-                        ? "bg-yellow-100"
-                        : child.status === "safe"
-                          ? "bg-green-100"
-                          : "bg-gray-100"
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-bold capitalize ${
-                        child.status === "in-van" ||
-                        child.status === "returning"
-                          ? "text-yellow-700"
-                          : child.status === "safe"
-                            ? "text-green-700"
-                            : "text-gray-600"
-                      }`}
-                    >
-                      {child.status === "in-van"
-                        ? "Going to School"
-                        : child.status === "returning"
-                          ? "Coming Home"
-                          : child.status}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* Status Update Toggle Button */}
-              {!child.isAbsent && (
                 <TouchableOpacity
-                  onPress={() => confirmToggleStatus(child)}
-                  className={`p-3 rounded-full ml-2 shadow-sm ${
-                    child.status === "in-van" || child.status === "returning"
-                      ? "bg-white"
-                      : "bg-blue-100"
-                  }`}
+                  style={styles.studentCardBody}
+                  onPress={() =>
+                    navigation.navigate("StudentDetails", { student: child })
+                  }
                 >
-                  <FontAwesome5
-                    name={
-                      child.status === "in-van" || child.status === "returning"
-                        ? "walking"
-                        : "bus"
-                    }
-                    size={20}
-                    color="#2563EB"
-                  />
+                  {/* Name row */}
+                  <View style={styles.studentNameRow}>
+                    <Text style={styles.studentName}>{child.name}</Text>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={15}
+                      color={C.gray400}
+                    />
+                  </View>
+
+                  {/* School */}
+                  <Text style={styles.studentSchool}>{child.school}</Text>
+
+                  {/* Status badge */}
+                  {child.isAbsent ? (
+                    <View style={styles.absentBadge}>
+                      <Text style={styles.absentBadgeText}>🔴 ABSENT</Text>
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        isInVan
+                          ? styles.statusBadgeInVan
+                          : child.status === "safe"
+                            ? styles.statusBadgeSafe
+                            : styles.statusBadgeSchool,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusBadgeText,
+                          isInVan
+                            ? styles.statusTextInVan
+                            : child.status === "safe"
+                              ? styles.statusTextSafe
+                              : styles.statusTextSchool,
+                        ]}
+                      >
+                        {child.status === "in-van"
+                          ? "Going to School"
+                          : child.status === "returning"
+                            ? "Coming Home"
+                            : child.status === "school"
+                              ? "At School"
+                              : "Safe"}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
-              )}
-            </View>
-          ))
+
+                {/* Status Toggle Button */}
+                {!child.isAbsent && (
+                  <TouchableOpacity
+                    onPress={() => confirmToggleStatus(child)}
+                    style={[
+                      styles.statusToggleBtn,
+                      isInVan
+                        ? styles.statusToggleBtnActive
+                        : styles.statusToggleBtnIdle,
+                    ]}
+                  >
+                    <FontAwesome5
+                      name={isInVan ? "walking" : "bus"}
+                      size={18}
+                      color={isInVan ? C.amber : C.blueMid}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })
         )}
-        <View className="mb-10"></View>
+
+        <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* Broadcast Alert Modal */}
+      {/* ── Broadcast Alert Modal ── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -636,60 +711,50 @@ const DriverDashboard = ({ navigation }) => {
         onRequestClose={() => setAlertModalVisible(false)}
       >
         <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            paddingHorizontal: 20,
-          }}
+          style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => Keyboard.dismiss()}
         >
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => Keyboard.dismiss()}
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 24,
-              shadowColor: "#000",
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
-            }}
+            style={styles.modalCard}
           >
-            <View className="flex-row justify-between items-center mb-4">
-              <View className="flex-row items-center">
-                <Ionicons name="warning" size={28} color="#EF4444" />
-                <Text className="text-xl font-bold text-gray-800 ml-2">
-                  Emergency Alert
-                </Text>
+            {/* Modal header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalWarningIcon}>
+                  <Ionicons name="warning" size={22} color={C.red} />
+                </View>
+                <Text style={styles.modalTitle}>Emergency Alert</Text>
               </View>
               <TouchableOpacity
                 onPress={() => {
                   Keyboard.dismiss();
                   setAlertModalVisible(false);
                 }}
+                style={styles.modalCloseBtn}
               >
-                <Ionicons name="close-circle" size={28} color="#9CA3AF" />
+                <Ionicons name="close" size={20} color={C.gray600} />
               </TouchableOpacity>
             </View>
 
-            <Text className="text-gray-500 text-sm mb-4">
-              Select a quick message below or type your own to notify all
-              parents instantly.
+            <Text style={styles.modalSubtitle}>
+              Select a quick message or type your own to notify all parents
+              instantly.
             </Text>
 
+            {/* Quick message options */}
             <TouchableOpacity
               onPress={() =>
                 sendBroadcastAlert(
                   "🚐 Heavy Traffic! I will be delayed by 15-20 minutes.",
                 )
               }
-              className="bg-orange-50 border border-orange-200 p-3 rounded-xl mb-3"
+              style={[styles.quickMsgBtn, styles.quickMsgBtnOrange]}
             >
-              <Text className="text-orange-800 font-semibold text-sm">
-                🚐 Heavy Traffic - Running Late
+              <Text style={[styles.quickMsgText, { color: "#92400E" }]}>
+                🚐 Heavy Traffic – Running Late
               </Text>
             </TouchableOpacity>
 
@@ -699,10 +764,10 @@ const DriverDashboard = ({ navigation }) => {
                   "🌧️ Bad Weather! Driving slowly, expect slight delays.",
                 )
               }
-              className="bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3"
+              style={[styles.quickMsgBtn, styles.quickMsgBtnBlue]}
             >
-              <Text className="text-blue-800 font-semibold text-sm">
-                🌧️ Bad Weather - Expect Delays
+              <Text style={[styles.quickMsgText, { color: "#1E3A5F" }]}>
+                🌧️ Bad Weather – Expect Delays
               </Text>
             </TouchableOpacity>
 
@@ -712,33 +777,32 @@ const DriverDashboard = ({ navigation }) => {
                   "⚠️ Van Breakdown! Please hold on, arranging alternative transport.",
                 )
               }
-              className="bg-red-50 border border-red-200 p-3 rounded-xl mb-4"
+              style={[styles.quickMsgBtn, styles.quickMsgBtnRed]}
             >
-              <Text className="text-red-800 font-semibold text-sm">
-                ⚠️ Van Breakdown - Urgent!
+              <Text style={[styles.quickMsgText, { color: C.red }]}>
+                ⚠️ Van Breakdown – Urgent!
               </Text>
             </TouchableOpacity>
 
-            <Text className="text-gray-600 font-bold mb-2 text-xs uppercase">
-              Or type custom message:
-            </Text>
+            {/* Custom message */}
+            <Text style={styles.customMsgLabel}>Or type a custom message:</Text>
             <TextInput
-              className="bg-gray-100 p-4 rounded-xl text-gray-800 min-h-[80px]"
+              style={styles.customMsgInput}
               placeholder="E.g. Leaving school in 5 mins..."
+              placeholderTextColor={C.gray400}
               multiline
               textAlignVertical="top"
               value={customAlertMsg}
               onChangeText={setCustomAlertMsg}
             />
 
+            {/* Send button */}
             <TouchableOpacity
               onPress={() => sendBroadcastAlert(customAlertMsg)}
-              className="bg-red-500 p-4 rounded-xl mt-4 items-center flex-row justify-center"
+              style={styles.sendBtn}
             >
-              <Ionicons name="send" size={20} color="white" />
-              <Text className="text-white font-bold text-lg ml-2">
-                Send to All Parents
-              </Text>
+              <Ionicons name="send" size={18} color={C.white} />
+              <Text style={styles.sendBtnText}>Send to All Parents</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -746,5 +810,580 @@ const DriverDashboard = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+// Styles
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#EEF4FF",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 20,
+  },
+
+  // Header
+  header: {
+    marginBottom: 20,
+    paddingTop: 8,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  driverInfoBlock: {},
+  greetingLabel: {
+    fontSize: 12,
+    color: C.gray1000,
+    fontWeight: "500",
+    letterSpacing: 0.3,
+  },
+  driverName: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: C.navy,
+    letterSpacing: -0.4,
+    marginTop: 1,
+    marginBottom: 4,
+  },
+  mobileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  mobileText: {
+    fontSize: 12,
+    color: C.gray1000,
+    marginLeft: 3,
+  },
+  avatarWrapper: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  avatarImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 2.5,
+    borderColor: C.white,
+  },
+  avatarFallback: {
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: C.white,
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: 1,
+    right: 1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: C.green,
+    borderWidth: 2,
+    borderColor: C.white,
+  },
+  vanBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1C1917",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  vanBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.amber,
+    marginLeft: 4,
+  },
+  vanBadgeSep: {
+    color: "#78716C",
+    fontSize: 12,
+  },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.navy,
+    marginBottom: 10,
+  },
+
+  // Map
+  mapWrapper: {
+    height: 220,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 14,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  mapMarker: {
+    backgroundColor: C.blueMid,
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: C.white,
+  },
+  mapExpandHint: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  mapExpandText: {
+    color: C.white,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  // Broadcast
+  broadcastBtn: {
+    backgroundColor: C.white,
+    borderWidth: 1.5,
+    borderColor: "#FECACA",
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: C.red,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  broadcastIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    backgroundColor: C.redLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  broadcastTextBox: {
+    flex: 1,
+  },
+  broadcastTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.red,
+  },
+  broadcastSub: {
+    fontSize: 11,
+    color: "#F87171",
+    marginTop: 2,
+  },
+
+  // Journey button
+  journeyBtn: {
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 7,
+  },
+  journeyBtnStart: {
+    backgroundColor: C.blue,
+    shadowColor: C.navy,
+  },
+  journeyBtnEnd: {
+    backgroundColor: C.red,
+    shadowColor: C.red,
+  },
+  journeyBtnText: {
+    color: C.white,
+    fontSize: 17,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+  },
+
+  // Payments button
+  paymentsBtn: {
+    backgroundColor: C.green,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    marginBottom: 16,
+    shadowColor: "#065F46",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  paymentsBtnIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  paymentsBtnTextBox: { flex: 1 },
+  paymentsBtnTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.white,
+  },
+  paymentsBtnSub: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.72)",
+    marginTop: 2,
+  },
+
+  // Occupancy
+  occupancyCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: C.gray100,
+  },
+  occupancyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  occupancyTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.navy,
+  },
+  occupancyBadge: {
+    backgroundColor: C.blueLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  occupancyBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.blueMid,
+  },
+  progressTrack: {
+    width: "100%",
+    height: 10,
+    backgroundColor: C.gray100,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 10,
+  },
+  occupancyFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  occupancyFooterText: {
+    fontSize: 12,
+    color: C.gray400,
+    fontWeight: "500",
+  },
+  occupancyFooterBold: {
+    fontWeight: "700",
+    color: C.gray800,
+  },
+
+  // Student card
+  studentCard: {
+    borderRadius: 16,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  studentCardDefault: {
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.gray100,
+  },
+  studentCardAbsent: {
+    backgroundColor: C.redLight,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  studentCardInVan: {
+    backgroundColor: C.amberLight,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  studentCardAccent: {
+    width: 4,
+    alignSelf: "stretch",
+  },
+  studentCardBody: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingLeft: 14,
+    paddingRight: 8,
+  },
+  studentNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 3,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.navy,
+  },
+  studentSchool: {
+    fontSize: 11,
+    color: C.gray600,
+    marginBottom: 7,
+  },
+
+  // Status badges
+  absentBadge: {
+    backgroundColor: "#FECACA",
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  absentBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.red,
+  },
+  statusBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusBadgeInVan: { backgroundColor: "#FDE68A" },
+  statusBadgeSafe: { backgroundColor: "#BBF7D0" },
+  statusBadgeSchool: { backgroundColor: C.gray100 },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  statusTextInVan: { color: "#92400E" },
+  statusTextSafe: { color: C.green },
+  statusTextSchool: { color: C.gray600 },
+
+  // Status toggle
+  statusToggleBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    marginLeft: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statusToggleBtnIdle: {
+    backgroundColor: C.blueLight,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  statusToggleBtnActive: {
+    backgroundColor: C.amberLight,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+
+  // Empty
+  emptyCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    paddingVertical: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    borderStyle: "dashed",
+    marginBottom: 12,
+  },
+  emptyText: {
+    color: C.gray400,
+    marginTop: 10,
+    fontSize: 14,
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(10,22,50,0.65)",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  modalCard: {
+    backgroundColor: C.white,
+    borderRadius: 24,
+    padding: 22,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  modalHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  modalWarningIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: C.redLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: C.navy,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: C.gray400,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  quickMsgBtn: {
+    padding: 13,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  quickMsgBtnOrange: {
+    backgroundColor: "#FEF3C7",
+    borderColor: "#FDE68A",
+  },
+  quickMsgBtnBlue: {
+    backgroundColor: C.blueLight,
+    borderColor: "#BFDBFE",
+  },
+  quickMsgBtnRed: {
+    backgroundColor: C.redLight,
+    borderColor: "#FECACA",
+  },
+  quickMsgText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  customMsgLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.gray600,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  customMsgInput: {
+    backgroundColor: C.gray50,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderRadius: 14,
+    padding: 14,
+    minHeight: 80,
+    fontSize: 13,
+    color: C.gray800,
+  },
+  sendBtn: {
+    backgroundColor: C.red,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: C.red,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  sendBtnText: {
+    color: C.white,
+    fontWeight: "800",
+    fontSize: 15,
+    marginLeft: 10,
+  },
+});
 
 export default DriverDashboard;

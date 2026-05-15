@@ -123,7 +123,7 @@ const ParentDriversScreen = () => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 p-5">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#EEF4FF" }}>
       <Text className="text-2xl font-bold text-gray-800 mb-6">
         My School Vans
       </Text>
